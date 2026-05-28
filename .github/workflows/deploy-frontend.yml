@@ -20,7 +20,7 @@ permissions:
   contents: read
 
 env:
-  AWS_REGION: ${{ vars.AWS_REGION }}
+  AWS_REGION: ${{ vars.AWS_REGION || 'eu-central-1' }}
   BUILD_PATH: dist/apps/budget-audit-web
 
 jobs:

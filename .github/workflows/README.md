@@ -41,7 +41,7 @@ En **Settings → Secrets and variables → Actions**:
 - `OPENAI_API_KEY` — usado por `deploy-infra` y `destroy-infra` como `-var`.
 
 ### Repository variables
-- `AWS_REGION` — ej. `us-east-1`.
+- `AWS_REGION` — ej. `eu-central-1` (default si no se define).
 
 ### Environment `production`
 - Habilita "Required reviewers" para gate humano en deploys y destroys.

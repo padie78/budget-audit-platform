@@ -13,7 +13,7 @@ export function getDocumentClient(
 ): DynamoDBDocumentClient {
   if (documentClient) return documentClient;
   const base = new DynamoDBClient({
-    region: options.region ?? process.env['AWS_REGION'] ?? 'us-east-1',
+    region: options.region ?? process.env['AWS_REGION'] ?? 'eu-central-1',
     endpoint: options.endpoint ?? process.env['DYNAMODB_ENDPOINT'],
   });
   documentClient = DynamoDBDocumentClient.from(base, {
