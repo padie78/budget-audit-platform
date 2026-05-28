@@ -1,15 +1,28 @@
 import type { AppSyncResolverEvent, AppSyncResolverHandler } from 'aws-lambda';
 import {
+  ConsoleLogger,
   DynamoDbBudgetRepository,
   DynamoDbContractRepository,
   DynamoDbSupplierRepository,
+  UuidIdGenerator,
 } from '@budget-audit/infrastructure';
 import {
   BudgetMapper,
   ContractMapper,
+  CreateSupplierUseCase,
+  DeleteSupplierUseCase,
+  ListSuppliersUseCase,
   SupplierMapper,
+  UpdateSupplierUseCase,
 } from '@budget-audit/application';
-import type { BudgetDto, ContractDto, SupplierDto } from '@budget-audit/common';
+import type {
+  BudgetDto,
+  ContractDto,
+  CreateSupplierInputDto,
+  DeleteSupplierResultDto,
+  SupplierDto,
+  UpdateSupplierInputDto,
+} from '@budget-audit/common';
 
 /* =============================================================================
  * AppSync Direct Lambda Resolver — router agrupado por `info.fieldName`.
@@ -19,6 +32,25 @@ import type { BudgetDto, ContractDto, SupplierDto } from '@budget-audit/common';
  * propio resolver dedicado.
  * ============================================================================= */
 
+/**
+ * Shape de SmartThresholds tal como lo envía AppSync: como lista de entries
+ * (clean GraphQL) en lugar del Record<string, number> que usa el dominio.
+ */
+interface SmartThresholdsGraphQLInput {
+  defaultTolerancePercentage: number;
+  categories?: Array<{ category: string; tolerancePercentage: number }>;
+}
+
+interface CreateSupplierGraphQLInput
+  extends Omit<CreateSupplierInputDto, 'smartThresholds'> {
+  smartThresholds?: SmartThresholdsGraphQLInput;
+}
+
+interface UpdateSupplierGraphQLInput
+  extends Omit<UpdateSupplierInputDto, 'smartThresholds'> {
+  smartThresholds?: SmartThresholdsGraphQLInput;
+}
+
 type ResolverArgs =
   | { fieldName: 'getBudget'; args: { supplierId: string; budgetId: string } }
   | {
@@ -26,6 +58,10 @@ type ResolverArgs =
       args: { supplierId: string; limit?: number };
     }
   | { fieldName: 'getSupplier'; args: { supplierId: string } }
+  | { fieldName: 'listSuppliers'; args: { limit?: number } }
+  | { fieldName: 'createSupplier'; args: { input: CreateSupplierGraphQLInput } }
+  | { fieldName: 'updateSupplier'; args: { input: UpdateSupplierGraphQLInput } }
+  | { fieldName: 'deleteSupplier'; args: { id: string } }
   | {
       fieldName: 'getContract';
       args: { supplierId: string; contractId: string };
@@ -35,16 +71,64 @@ type ResolverArgs =
       args: { supplierId: string; at?: string };
     };
 
+/* ─────────── Helpers de mapeo AppSync ↔ Dominio ─────────── */
+
+function smartThresholdsInputToDto(
+  input?: SmartThresholdsGraphQLInput,
+): { defaultTolerancePercentage: number; categories: Record<string, number> }
+  | undefined {
+  if (!input) return undefined;
+  const categories: Record<string, number> = {};
+  for (const e of input.categories ?? []) {
+    categories[e.category] = e.tolerancePercentage;
+  }
+  return {
+    defaultTolerancePercentage: input.defaultTolerancePercentage,
+    categories,
+  };
+}
+
+function supplierDtoToGraphQL(dto: SupplierDto): Record<string, unknown> {
+  if (!dto.smartThresholds) return { ...dto };
+  const categories = Object.entries(dto.smartThresholds.categories).map(
+    ([category, tolerancePercentage]) => ({ category, tolerancePercentage }),
+  );
+  return {
+    ...dto,
+    smartThresholds: {
+      defaultTolerancePercentage:
+        dto.smartThresholds.defaultTolerancePercentage,
+      categories,
+    },
+  };
+}
+
+function adaptCreateInput(
+  input: CreateSupplierGraphQLInput,
+): CreateSupplierInputDto {
+  return { ...input, smartThresholds: smartThresholdsInputToDto(input.smartThresholds) };
+}
+
+function adaptUpdateInput(
+  input: UpdateSupplierGraphQLInput,
+): UpdateSupplierInputDto {
+  return { ...input, smartThresholds: smartThresholdsInputToDto(input.smartThresholds) };
+}
+
 type ResolverResult =
   | BudgetDto
   | BudgetDto[]
-  | SupplierDto
+  | Record<string, unknown>
+  | Record<string, unknown>[]
   | ContractDto
+  | DeleteSupplierResultDto
   | null;
 
 let cachedBudgetRepo: DynamoDbBudgetRepository | undefined;
 let cachedSupplierRepo: DynamoDbSupplierRepository | undefined;
 let cachedContractRepo: DynamoDbContractRepository | undefined;
+const idGenerator = new UuidIdGenerator();
+const logger = new ConsoleLogger({ source: 'appsync_api_lambda' });
 
 function budgets(): DynamoDbBudgetRepository {
   if (!cachedBudgetRepo) cachedBudgetRepo = new DynamoDbBudgetRepository();
@@ -87,7 +171,42 @@ export const handler: AppSyncResolverHandler<
 
     case 'getSupplier': {
       const supplier = await suppliers().findById(op.args.supplierId);
-      return supplier ? SupplierMapper.toDto(supplier) : null;
+      return supplier ? supplierDtoToGraphQL(SupplierMapper.toDto(supplier)) : null;
+    }
+
+    case 'listSuppliers': {
+      const useCase = new ListSuppliersUseCase({
+        supplierRepository: suppliers(),
+      });
+      const list = await useCase.execute(op.args.limit);
+      return list.map((s) => supplierDtoToGraphQL(SupplierMapper.toDto(s)));
+    }
+
+    case 'createSupplier': {
+      const useCase = new CreateSupplierUseCase({
+        supplierRepository: suppliers(),
+        idGenerator,
+        logger,
+      });
+      const created = await useCase.execute(adaptCreateInput(op.args.input));
+      return supplierDtoToGraphQL(SupplierMapper.toDto(created));
+    }
+
+    case 'updateSupplier': {
+      const useCase = new UpdateSupplierUseCase({
+        supplierRepository: suppliers(),
+        logger,
+      });
+      const updated = await useCase.execute(adaptUpdateInput(op.args.input));
+      return supplierDtoToGraphQL(SupplierMapper.toDto(updated));
+    }
+
+    case 'deleteSupplier': {
+      const useCase = new DeleteSupplierUseCase({
+        supplierRepository: suppliers(),
+        logger,
+      });
+      return useCase.execute(op.args.id);
     }
 
     case 'getContract': {

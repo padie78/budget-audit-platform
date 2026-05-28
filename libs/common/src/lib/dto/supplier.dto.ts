@@ -76,6 +76,40 @@ export interface SupplierContactInfoDto {
   address?: string;
 }
 
+/* =============================================================================
+ * Inputs de mutations (ABM del Portal de Proveedores).
+ * ============================================================================= */
+
+export interface CreateSupplierInputDto {
+  name: string;
+  taxId: string;
+  contactEmail: string;
+  fidelityScore?: number;
+  thresholdPolicy?: ThresholdPolicyDto;
+  contactInfo?: SupplierContactInfoDto;
+  strategicIntelligence?: StrategicIntelligenceDto;
+  vendorPerformance?: VendorPerformanceDto;
+  smartThresholds?: SmartThresholdsDto;
+}
+
+export interface UpdateSupplierInputDto {
+  id: string;
+  name?: string;
+  taxId?: string;
+  contactEmail?: string;
+  fidelityScore?: number;
+  thresholdPolicy?: ThresholdPolicyDto;
+  contactInfo?: SupplierContactInfoDto;
+  strategicIntelligence?: StrategicIntelligenceDto;
+  vendorPerformance?: VendorPerformanceDto;
+  smartThresholds?: SmartThresholdsDto;
+}
+
+export interface DeleteSupplierResultDto {
+  id: string;
+  deleted: boolean;
+}
+
 export interface SupplierDto {
   id: string;
   name: string;

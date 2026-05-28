@@ -7,3 +7,7 @@ export * from './lib/use-cases/audit-budget/audit-budget.use-case';
 export * from './lib/use-cases/audit-budget/audit-budget.types';
 export * from './lib/use-cases/audit-budget/three-way-matcher';
 export * from './lib/use-cases/draft-dispute/draft-dispute.use-case';
+export * from './lib/use-cases/suppliers/create-supplier.use-case';
+export * from './lib/use-cases/suppliers/update-supplier.use-case';
+export * from './lib/use-cases/suppliers/delete-supplier.use-case';
+export * from './lib/use-cases/suppliers/list-suppliers.use-case';

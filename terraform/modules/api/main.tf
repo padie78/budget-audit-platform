@@ -169,6 +169,44 @@ resource "aws_appsync_resolver" "get_supplier" {
   response_template = local.direct_lambda_response_template
 }
 
+# ─────────── Portal de Proveedores (ABM) ───────────
+
+resource "aws_appsync_resolver" "list_suppliers" {
+  api_id            = aws_appsync_graphql_api.this.id
+  type              = "Query"
+  field             = "listSuppliers"
+  data_source       = aws_appsync_datasource.appsync_api.name
+  request_template  = local.direct_lambda_request_template
+  response_template = local.direct_lambda_response_template
+}
+
+resource "aws_appsync_resolver" "create_supplier" {
+  api_id            = aws_appsync_graphql_api.this.id
+  type              = "Mutation"
+  field             = "createSupplier"
+  data_source       = aws_appsync_datasource.appsync_api.name
+  request_template  = local.direct_lambda_request_template
+  response_template = local.direct_lambda_response_template
+}
+
+resource "aws_appsync_resolver" "update_supplier" {
+  api_id            = aws_appsync_graphql_api.this.id
+  type              = "Mutation"
+  field             = "updateSupplier"
+  data_source       = aws_appsync_datasource.appsync_api.name
+  request_template  = local.direct_lambda_request_template
+  response_template = local.direct_lambda_response_template
+}
+
+resource "aws_appsync_resolver" "delete_supplier" {
+  api_id            = aws_appsync_graphql_api.this.id
+  type              = "Mutation"
+  field             = "deleteSupplier"
+  data_source       = aws_appsync_datasource.appsync_api.name
+  request_template  = local.direct_lambda_request_template
+  response_template = local.direct_lambda_response_template
+}
+
 # Las mutations "publish*" son puramente pasivas (NONE datasource): solo
 # disparan las subscriptions. Esto evita el round-trip a Lambda.
 resource "aws_appsync_resolver" "publish_audit_completed" {

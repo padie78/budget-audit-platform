@@ -1,0 +1,262 @@
+:host {
+  display: block;
+  height: 100%;
+  color: rgb(226 232 240); /* slate-200 */
+}
+
+.page {
+  padding: 1.75rem 2rem 2.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  min-height: 100%;
+
+  &__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1.5rem;
+  }
+
+  &__title h1 {
+    font-size: 1.65rem;
+    font-weight: 700;
+    margin: 0;
+    color: rgb(241 245 249);
+    letter-spacing: -0.01em;
+  }
+
+  &__subtitle {
+    margin: 0.35rem 0 0;
+    color: rgb(148 163 184);
+    font-size: 0.95rem;
+    max-width: 64ch;
+  }
+
+  &__cta {
+    flex-shrink: 0;
+  }
+}
+
+/* KPIs */
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.85rem;
+}
+
+.kpi {
+  background: linear-gradient(180deg, rgb(30 41 59), rgb(15 23 42));
+  border: 1px solid rgb(51 65 85);
+  border-radius: 12px;
+  padding: 0.95rem 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+
+  &__label {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: rgb(148 163 184);
+    font-weight: 600;
+  }
+
+  &__value {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: rgb(241 245 249);
+  }
+
+  &--accent {
+    border-color: rgb(56 189 248); /* sky-400 */
+    .kpi__value { color: rgb(125 211 252); }
+  }
+  &--danger {
+    border-color: rgb(248 113 113); /* red-400 */
+    .kpi__value { color: rgb(248 113 113); }
+  }
+}
+
+/* Tabla */
+.table-wrap {
+  background: rgb(15 23 42);
+  border: 1px solid rgb(30 41 59);
+  border-radius: 14px;
+  padding: 0.5rem 0.5rem 0;
+  overflow: hidden;
+}
+
+.table-caption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem 0.5rem 0.75rem;
+
+  .search {
+    flex: 1;
+    max-width: 360px;
+
+    input {
+      width: 100%;
+    }
+  }
+}
+
+.cell-supplier {
+  display: flex;
+  flex-direction: column;
+
+  &__name {
+    font-weight: 600;
+    color: rgb(241 245 249);
+  }
+  &__id {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.72rem;
+    color: rgb(100 116 139);
+  }
+}
+
+.link {
+  color: rgb(125 211 252);
+  text-decoration: none;
+  &:hover { text-decoration: underline; }
+}
+
+.score {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.5rem;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  background: rgb(30 41 59);
+  border: 1px solid rgb(51 65 85);
+  font-weight: 600;
+  color: rgb(226 232 240);
+  font-size: 0.85rem;
+}
+
+.tolerance {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: rgb(226 232 240);
+}
+
+.row-actions {
+  display: flex;
+  justify-content: center;
+  gap: 0.25rem;
+}
+
+.empty {
+  text-align: center;
+  padding: 3rem 1rem;
+
+  &__inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  &__icon {
+    font-size: 2.5rem;
+    color: rgb(71 85 105);
+  }
+
+  &__text {
+    color: rgb(148 163 184);
+    margin: 0;
+  }
+}
+
+/* Form / Dialog */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+
+  &__grid {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+
+  &__section {
+    border: 1px solid rgb(30 41 59);
+    border-radius: 10px;
+    padding: 0.85rem 1rem 1rem;
+    background: rgb(15 23 42);
+
+    legend {
+      padding: 0 0.4rem;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: rgb(148 163 184);
+      font-weight: 700;
+    }
+  }
+
+  &__row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.85rem;
+    margin-top: 0.7rem;
+  }
+
+  &__field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+
+    ::ng-deep .p-inputnumber,
+    ::ng-deep .p-dropdown {
+      width: 100%;
+    }
+
+    &--full {
+      grid-column: 1 / -1;
+    }
+  }
+
+  &__label {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: rgb(203 213 225);
+    letter-spacing: 0.01em;
+  }
+
+  &__error {
+    color: rgb(252 165 165);
+    font-size: 0.72rem;
+  }
+
+  &__hint {
+    color: rgb(100 116 139);
+    font-size: 0.72rem;
+  }
+
+  &__footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.6rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid rgb(30 41 59);
+  }
+}
+
+::ng-deep .supplier-dialog {
+  .p-dialog-header {
+    background: linear-gradient(180deg, rgb(30 41 59), rgb(15 23 42));
+    color: rgb(241 245 249);
+    border-bottom: 1px solid rgb(30 41 59);
+  }
+  .p-dialog-content {
+    background: rgb(2 6 23);
+    color: rgb(226 232 240);
+  }
+}

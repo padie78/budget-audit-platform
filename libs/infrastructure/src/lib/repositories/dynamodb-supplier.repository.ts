@@ -1,4 +1,9 @@
-import { GetCommand } from '@aws-sdk/lib-dynamodb';
+import {
+  DeleteCommand,
+  GetCommand,
+  PutCommand,
+  ScanCommand,
+} from '@aws-sdk/lib-dynamodb';
 import {
   Money,
   RiskProfile,
@@ -14,20 +19,24 @@ import {
 import {
   DynamoKeys,
   EntityType,
+  KeyPrefix,
   type StrategicIntelligenceDto,
   type SupplierContactInfoDto,
   type SmartThresholdsDto,
   type VendorPerformanceDto,
 } from '@budget-audit/common';
+import { SupplierMapper } from '@budget-audit/application';
 import { getDocumentClient } from '../aws/dynamodb-client.factory';
 
 /* =============================================================================
  * DynamoDbSupplierRepository — adapter del puerto ISupplierRepository.
  *
- * Hydrata el aggregate root completo incluyendo los bloques enterprise
- * (strategicIntelligence, vendorPerformance, smartThresholds, contactInfo)
- * si están presentes en el item. Los bloques son opcionales: si el item
- * legacy no los tiene, el agregado se construye sin ellos.
+ * Mapeo (single-table design):
+ *   • PK = SUPPLIER#<id>, SK = METADATA
+ *   • entityType = SUPPLIER
+ *
+ * `listAll` usa Scan con filter `SK = METADATA`. Funciona para MVP pero a
+ * escala conviene un GSI dedicado (e.g. `GSI1PK=ENTITY#SUPPLIERS`).
  * ============================================================================= */
 
 interface SupplierItem {
@@ -48,7 +57,7 @@ interface SupplierItem {
   createdAt: string;
   updatedAt: string;
 
-  // ─────────── Bloques enterprise (opcionales) ───────────
+  // Bloques enterprise opcionales
   contactInfo?: SupplierContactInfoDto;
   strategicIntelligence?: StrategicIntelligenceDto;
   vendorPerformance?: VendorPerformanceDto;
@@ -60,7 +69,9 @@ export class DynamoDbSupplierRepository implements ISupplierRepository {
     private readonly tableName: string = process.env['TABLE_NAME'] ?? '',
     private readonly client = getDocumentClient(),
   ) {
-    if (!this.tableName) throw new Error('TABLE_NAME env variable es requerida.');
+    if (!this.tableName) {
+      throw new Error('TABLE_NAME env variable es requerida.');
+    }
   }
 
   async findById(supplierId: string): Promise<Supplier | null> {
@@ -72,6 +83,73 @@ export class DynamoDbSupplierRepository implements ISupplierRepository {
     );
     if (!res.Item) return null;
     return this.toEntity(res.Item as SupplierItem);
+  }
+
+  async save(supplier: Supplier): Promise<void> {
+    const dto = SupplierMapper.toDto(supplier);
+    const keys = DynamoKeys.supplier(supplier.id);
+
+    const item: SupplierItem = {
+      PK: keys.PK,
+      SK: keys.SK,
+      entityType: EntityType.Supplier,
+      id: dto.id,
+      name: dto.name,
+      taxId: dto.taxId,
+      contactEmail: dto.contactEmail,
+      fidelityScore: dto.fidelityScore,
+      thresholdPolicy: dto.thresholdPolicy,
+      createdAt: dto.createdAt,
+      updatedAt: dto.updatedAt,
+      contactInfo: dto.contactInfo,
+      strategicIntelligence: dto.strategicIntelligence,
+      vendorPerformance: dto.vendorPerformance,
+      smartThresholds: dto.smartThresholds,
+    };
+
+    await this.client.send(
+      new PutCommand({
+        TableName: this.tableName,
+        Item: item,
+      }),
+    );
+  }
+
+  async delete(supplierId: string): Promise<void> {
+    await this.client.send(
+      new DeleteCommand({
+        TableName: this.tableName,
+        Key: DynamoKeys.supplier(supplierId),
+      }),
+    );
+  }
+
+  async listAll(limit?: number): Promise<Supplier[]> {
+    const items: SupplierItem[] = [];
+    let lastEvaluatedKey: Record<string, unknown> | undefined;
+
+    do {
+      const res = await this.client.send(
+        new ScanCommand({
+          TableName: this.tableName,
+          FilterExpression: 'SK = :sk AND entityType = :type',
+          ExpressionAttributeValues: {
+            ':sk': KeyPrefix.Metadata,
+            ':type': EntityType.Supplier,
+          },
+          ExclusiveStartKey: lastEvaluatedKey,
+          Limit: limit,
+        }),
+      );
+
+      if (res.Items?.length) items.push(...(res.Items as SupplierItem[]));
+      lastEvaluatedKey = res.LastEvaluatedKey;
+
+      if (limit && items.length >= limit) break;
+    } while (lastEvaluatedKey);
+
+    const sliced = limit ? items.slice(0, limit) : items;
+    return sliced.map((it) => this.toEntity(it));
   }
 
   private toEntity(item: SupplierItem): Supplier {
@@ -102,31 +180,35 @@ export class DynamoDbSupplierRepository implements ISupplierRepository {
             riskProfile: RiskProfile.of({
               score: item.strategicIntelligence.riskProfile.score,
               level: item.strategicIntelligence.riskProfile.level,
-              lastCheck: new Date(item.strategicIntelligence.riskProfile.lastCheck),
+              lastCheck: new Date(
+                item.strategicIntelligence.riskProfile.lastCheck,
+              ),
             }),
             paymentStrategy: PaymentStrategy.of({
               earlyPaymentPreferred:
                 item.strategicIntelligence.paymentStrategy.earlyPaymentPreferred,
               discountTargetPercentage:
-                item.strategicIntelligence.paymentStrategy.discountTargetPercentage,
+                item.strategicIntelligence.paymentStrategy
+                  .discountTargetPercentage,
             }),
             diversityStatus: [...item.strategicIntelligence.diversityStatus],
             criticalityIndex: item.strategicIntelligence.criticalityIndex,
           })
         : undefined;
 
-    const vendorPerformance: VendorPerformance | undefined = item.vendorPerformance
-      ? VendorPerformance.of({
-          reliabilityScore: item.vendorPerformance.reliabilityScore,
-          totalAuditedDocs: item.vendorPerformance.totalAuditedDocs,
-          totalDisputesRaised: item.vendorPerformance.totalDisputesRaised,
-          averageDisputeResolutionDays:
-            item.vendorPerformance.averageDisputeResolutionDays,
-          slaDeliveryComplianceRate:
-            item.vendorPerformance.slaDeliveryComplianceRate,
-          trend: item.vendorPerformance.trend,
-        })
-      : undefined;
+    const vendorPerformance: VendorPerformance | undefined =
+      item.vendorPerformance
+        ? VendorPerformance.of({
+            reliabilityScore: item.vendorPerformance.reliabilityScore,
+            totalAuditedDocs: item.vendorPerformance.totalAuditedDocs,
+            totalDisputesRaised: item.vendorPerformance.totalDisputesRaised,
+            averageDisputeResolutionDays:
+              item.vendorPerformance.averageDisputeResolutionDays,
+            slaDeliveryComplianceRate:
+              item.vendorPerformance.slaDeliveryComplianceRate,
+            trend: item.vendorPerformance.trend,
+          })
+        : undefined;
 
     const smartThresholds: SmartThresholds | undefined = item.smartThresholds
       ? SmartThresholds.fromRecord(

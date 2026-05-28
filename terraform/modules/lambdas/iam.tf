@@ -28,6 +28,7 @@ data "aws_iam_policy_document" "lambda_inline" {
       "dynamodb:PutItem",
       "dynamodb:UpdateItem",
       "dynamodb:Query",
+      "dynamodb:Scan",
       "dynamodb:BatchGetItem",
       "dynamodb:BatchWriteItem",
       "dynamodb:DeleteItem",

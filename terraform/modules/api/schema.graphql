@@ -14,14 +14,100 @@ enum AlertSeverity {
   RED
 }
 
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum CriticalityIndex {
+  LOW
+  MEDIUM
+  HIGH
+  STRATEGIC
+}
+
+enum VendorTrend {
+  IMPROVING
+  STABLE
+  DEGRADING
+}
+
+# ─────────── Supplier core + extensiones enterprise (opcionales) ───────────
+
+type ThresholdPolicy {
+  percentTolerance: Float!
+  absoluteTolerance: Float
+  autoApprovalUpTo: Float
+  currency: String!
+}
+
+type SupplierContactInfo {
+  email: String!
+  phone: String
+  address: String
+}
+
+type RiskProfile {
+  score: Float!
+  level: RiskLevel!
+  lastCheck: String!
+}
+
+type PaymentStrategy {
+  earlyPaymentPreferred: Boolean!
+  discountTargetPercentage: Float!
+}
+
+type StrategicIntelligence {
+  riskProfile: RiskProfile!
+  paymentStrategy: PaymentStrategy!
+  diversityStatus: [String!]!
+  criticalityIndex: CriticalityIndex!
+}
+
+type VendorPerformance {
+  reliabilityScore: Float!
+  totalAuditedDocs: Int!
+  totalDisputesRaised: Int!
+  averageDisputeResolutionDays: Float!
+  slaDeliveryComplianceRate: Float!
+  trend: VendorTrend!
+}
+
+type SmartThresholdCategoryEntry {
+  category: String!
+  tolerancePercentage: Float!
+}
+
+type SmartThresholds {
+  defaultTolerancePercentage: Float!
+  categories: [SmartThresholdCategoryEntry!]!
+}
+
 type Supplier {
   id: ID!
   name: String!
   taxId: String!
   contactEmail: String!
+  fidelityScore: Float!
+  thresholdPolicy: ThresholdPolicy!
   createdAt: AWSDateTime!
   updatedAt: AWSDateTime!
+
+  contactInfo: SupplierContactInfo
+  strategicIntelligence: StrategicIntelligence
+  vendorPerformance: VendorPerformance
+  smartThresholds: SmartThresholds
 }
+
+type DeleteSupplierResult {
+  id: ID!
+  deleted: Boolean!
+}
+
+# ─────────── Budget audit ───────────
 
 type ExtractedBudgetItem {
   sku: String!
@@ -73,6 +159,83 @@ type SignedUploadUrl {
   expiresIn: Int!
 }
 
+# ─────────── Inputs ───────────
+
+input ThresholdPolicyInput {
+  percentTolerance: Float!
+  absoluteTolerance: Float
+  autoApprovalUpTo: Float
+  currency: String!
+}
+
+input SupplierContactInfoInput {
+  email: String!
+  phone: String
+  address: String
+}
+
+input RiskProfileInput {
+  score: Float!
+  level: RiskLevel!
+  lastCheck: String!
+}
+
+input PaymentStrategyInput {
+  earlyPaymentPreferred: Boolean!
+  discountTargetPercentage: Float!
+}
+
+input StrategicIntelligenceInput {
+  riskProfile: RiskProfileInput!
+  paymentStrategy: PaymentStrategyInput!
+  diversityStatus: [String!]!
+  criticalityIndex: CriticalityIndex!
+}
+
+input VendorPerformanceInput {
+  reliabilityScore: Float!
+  totalAuditedDocs: Int!
+  totalDisputesRaised: Int!
+  averageDisputeResolutionDays: Float!
+  slaDeliveryComplianceRate: Float!
+  trend: VendorTrend!
+}
+
+input SmartThresholdCategoryEntryInput {
+  category: String!
+  tolerancePercentage: Float!
+}
+
+input SmartThresholdsInput {
+  defaultTolerancePercentage: Float!
+  categories: [SmartThresholdCategoryEntryInput!]
+}
+
+input CreateSupplierInput {
+  name: String!
+  taxId: String!
+  contactEmail: String!
+  fidelityScore: Float
+  thresholdPolicy: ThresholdPolicyInput
+  contactInfo: SupplierContactInfoInput
+  strategicIntelligence: StrategicIntelligenceInput
+  vendorPerformance: VendorPerformanceInput
+  smartThresholds: SmartThresholdsInput
+}
+
+input UpdateSupplierInput {
+  id: ID!
+  name: String
+  taxId: String
+  contactEmail: String
+  fidelityScore: Float
+  thresholdPolicy: ThresholdPolicyInput
+  contactInfo: SupplierContactInfoInput
+  strategicIntelligence: StrategicIntelligenceInput
+  vendorPerformance: VendorPerformanceInput
+  smartThresholds: SmartThresholdsInput
+}
+
 input AuditBudgetInput {
   supplierId: ID!
   s3Url: String!
@@ -85,18 +248,24 @@ input SignUploadInput {
   contentType: String!
 }
 
+# ─────────── Operations ───────────
+
 type Query {
   getBudget(supplierId: ID!, budgetId: ID!): Budget
   listBudgetsBySupplier(supplierId: ID!, limit: Int): [Budget!]!
   getSupplier(supplierId: ID!): Supplier
+  listSuppliers(limit: Int): [Supplier!]!
 }
 
 type Mutation {
-  # Mutation principal: dispara la auditoría completa de un PDF.
+  # Auditoría
   auditBudget(input: AuditBudgetInput!): Budget!
-
-  # Genera una URL pre-firmada para subir el PDF a S3.
   signUpload(input: SignUploadInput!): SignedUploadUrl!
+
+  # Portal de proveedores
+  createSupplier(input: CreateSupplierInput!): Supplier!
+  updateSupplier(input: UpdateSupplierInput!): Supplier!
+  deleteSupplier(id: ID!): DeleteSupplierResult!
 
   # Mutations internas usadas por la propia Lambda para emitir eventos
   # que despiertan a las subscriptions. NO usar desde el frontend.
@@ -105,8 +274,6 @@ type Mutation {
 }
 
 type Subscription {
-  # El frontend se suscribe filtrando por supplierId para recibir el
-  # reporte final en cuanto la Lambda termine de procesar.
   onAuditCompleted(supplierId: ID!): Budget
     @aws_subscribe(mutations: ["publishAuditCompleted"])
 

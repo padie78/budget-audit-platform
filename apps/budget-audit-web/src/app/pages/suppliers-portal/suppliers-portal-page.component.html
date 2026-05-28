@@ -1,0 +1,391 @@
+<p-toast position="top-right"></p-toast>
+<p-confirmDialog [style]="{ width: '440px' }"></p-confirmDialog>
+
+<div class="page">
+  <!-- Header con KPIs -->
+  <header class="page__header">
+    <div class="page__title">
+      <h1>Portal de Proveedores</h1>
+      <p class="page__subtitle">
+        Catálogo maestro de proveedores: identidad, política de tolerancia
+        e inteligencia estratégica.
+      </p>
+    </div>
+
+    <button
+      pButton
+      type="button"
+      icon="pi pi-plus"
+      label="Nuevo Proveedor"
+      class="p-button-rounded p-button-primary page__cta"
+      (click)="openCreate()"
+    ></button>
+  </header>
+
+  <section class="kpis">
+    <article class="kpi">
+      <span class="kpi__label">Total</span>
+      <span class="kpi__value">{{ stats().total }}</span>
+    </article>
+    <article class="kpi kpi--accent">
+      <span class="kpi__label">Estratégicos</span>
+      <span class="kpi__value">{{ stats().strategic }}</span>
+    </article>
+    <article class="kpi kpi--danger">
+      <span class="kpi__label">Riesgo alto</span>
+      <span class="kpi__value">{{ stats().highRisk }}</span>
+    </article>
+    <article class="kpi">
+      <span class="kpi__label">Tolerancia promedio</span>
+      <span class="kpi__value">{{ stats().avgTolerance }}%</span>
+    </article>
+  </section>
+
+  <!-- Tabla -->
+  <section class="table-wrap">
+    <p-table
+      #dt
+      [value]="rows()"
+      [loading]="loading()"
+      [paginator]="true"
+      [rows]="10"
+      [rowsPerPageOptions]="[10, 25, 50]"
+      [globalFilterFields]="['name', 'taxId', 'contactEmail']"
+      [scrollable]="true"
+      [responsiveLayout]="'stack'"
+      dataKey="id"
+      styleClass="p-datatable-sm p-datatable-striped"
+      currentPageReportTemplate="{first} - {last} de {totalRecords}"
+      [showCurrentPageReport]="true"
+    >
+      <ng-template pTemplate="caption">
+        <div class="table-caption">
+          <span class="p-input-icon-left search">
+            <i class="pi pi-search"></i>
+            <input
+              pInputText
+              type="text"
+              placeholder="Buscar por nombre, CUIT o email…"
+              (input)="dt.filterGlobal($any($event.target).value, 'contains')"
+            />
+          </span>
+
+          <button
+            pButton
+            type="button"
+            icon="pi pi-refresh"
+            class="p-button-text p-button-sm"
+            pTooltip="Refrescar"
+            tooltipPosition="bottom"
+            (click)="fetchSuppliers()"
+          ></button>
+        </div>
+      </ng-template>
+
+      <ng-template pTemplate="header">
+        <tr>
+          <th pSortableColumn="name" style="min-width: 220px">
+            Nombre <p-sortIcon field="name"></p-sortIcon>
+          </th>
+          <th pSortableColumn="taxId">
+            CUIT / Tax ID <p-sortIcon field="taxId"></p-sortIcon>
+          </th>
+          <th pSortableColumn="contactEmail">
+            Email <p-sortIcon field="contactEmail"></p-sortIcon>
+          </th>
+          <th pSortableColumn="fidelityScore">
+            Fidelidad <p-sortIcon field="fidelityScore"></p-sortIcon>
+          </th>
+          <th pSortableColumn="tolerancePercent">
+            Tolerancia <p-sortIcon field="tolerancePercent"></p-sortIcon>
+          </th>
+          <th>Riesgo</th>
+          <th>Trend</th>
+          <th>Criticidad</th>
+          <th style="width: 110px; text-align: center">Acciones</th>
+        </tr>
+      </ng-template>
+
+      <ng-template pTemplate="body" let-row>
+        <tr>
+          <td>
+            <div class="cell-supplier">
+              <span class="cell-supplier__name">{{ row.name }}</span>
+              <span class="cell-supplier__id">#{{ row.id.slice(0, 8) }}</span>
+            </div>
+          </td>
+          <td>{{ row.taxId }}</td>
+          <td>
+            <a class="link" [href]="'mailto:' + row.contactEmail">{{
+              row.contactEmail
+            }}</a>
+          </td>
+          <td>
+            <span class="score">{{ row.fidelityScore }}</span>
+          </td>
+          <td>
+            <span class="tolerance">{{ row.tolerancePercent }}%</span>
+          </td>
+          <td>
+            <p-tag
+              *ngIf="row.riskLevel; else dash"
+              [value]="row.riskLevel"
+              [severity]="riskSeverity(row.riskLevel)"
+              [rounded]="true"
+            ></p-tag>
+          </td>
+          <td>
+            <p-tag
+              *ngIf="row.trend; else dash"
+              [value]="row.trend"
+              [severity]="trendSeverity(row.trend)"
+              [rounded]="true"
+            ></p-tag>
+          </td>
+          <td>{{ criticalityLabel(row.criticality) }}</td>
+          <td>
+            <div class="row-actions">
+              <button
+                pButton
+                type="button"
+                icon="pi pi-pencil"
+                class="p-button-text p-button-sm"
+                pTooltip="Editar"
+                tooltipPosition="left"
+                (click)="openEdit(row)"
+              ></button>
+              <button
+                pButton
+                type="button"
+                icon="pi pi-trash"
+                class="p-button-text p-button-sm p-button-danger"
+                pTooltip="Eliminar"
+                tooltipPosition="left"
+                (click)="confirmDelete(row)"
+              ></button>
+            </div>
+          </td>
+        </tr>
+      </ng-template>
+
+      <ng-template pTemplate="emptymessage">
+        <tr>
+          <td colspan="9" class="empty">
+            <div class="empty__inner">
+              <i class="pi pi-inbox empty__icon"></i>
+              <p class="empty__text">
+                {{
+                  loading()
+                    ? 'Cargando proveedores…'
+                    : 'Aún no hay proveedores cargados.'
+                }}
+              </p>
+              <button
+                *ngIf="!loading()"
+                pButton
+                type="button"
+                label="Crear el primero"
+                icon="pi pi-plus"
+                (click)="openCreate()"
+              ></button>
+            </div>
+          </td>
+        </tr>
+      </ng-template>
+    </p-table>
+  </section>
+</div>
+
+<ng-template #dash>—</ng-template>
+
+<!-- Dialog de Crear / Editar -->
+<p-dialog
+  [visible]="dialogVisible()"
+  (visibleChange)="$event ? null : closeDialog()"
+  [modal]="true"
+  [closable]="true"
+  [draggable]="false"
+  [resizable]="false"
+  [style]="{ width: '720px' }"
+  styleClass="supplier-dialog"
+  [header]="editingId() ? 'Editar Proveedor' : 'Nuevo Proveedor'"
+>
+  <form [formGroup]="form" class="form" (ngSubmit)="submit()">
+    <div class="form__grid">
+      <!-- Datos básicos -->
+      <fieldset class="form__section">
+        <legend>Datos básicos</legend>
+
+        <div class="form__row">
+          <label class="form__field form__field--full">
+            <span class="form__label">Razón social *</span>
+            <input
+              pInputText
+              type="text"
+              formControlName="name"
+              placeholder="Ej: Distribuidora Andes S.A."
+            />
+            <small *ngIf="hasError('name', 'required')" class="form__error">
+              Obligatorio.
+            </small>
+            <small *ngIf="hasError('name', 'minlength')" class="form__error">
+              Mínimo 2 caracteres.
+            </small>
+          </label>
+        </div>
+
+        <div class="form__row">
+          <label class="form__field">
+            <span class="form__label">CUIT / Tax ID *</span>
+            <input
+              pInputText
+              type="text"
+              formControlName="taxId"
+              placeholder="30-12345678-9"
+            />
+            <small *ngIf="hasError('taxId', 'required')" class="form__error">
+              Obligatorio.
+            </small>
+            <small *ngIf="hasError('taxId', 'minlength')" class="form__error">
+              Demasiado corto.
+            </small>
+          </label>
+
+          <label class="form__field">
+            <span class="form__label">Email de contacto *</span>
+            <input
+              pInputText
+              type="email"
+              formControlName="contactEmail"
+              placeholder="contacto@proveedor.com"
+            />
+            <small
+              *ngIf="hasError('contactEmail', 'required')"
+              class="form__error"
+            >
+              Obligatorio.
+            </small>
+            <small
+              *ngIf="hasError('contactEmail', 'email')"
+              class="form__error"
+            >
+              Email inválido.
+            </small>
+          </label>
+        </div>
+
+        <div class="form__row">
+          <label class="form__field">
+            <span class="form__label">Teléfono</span>
+            <input
+              pInputText
+              type="tel"
+              formControlName="phone"
+              placeholder="+54 11 ..."
+            />
+          </label>
+
+          <label class="form__field">
+            <span class="form__label">Fidelity Score (0–100)</span>
+            <p-inputNumber
+              formControlName="fidelityScore"
+              [min]="0"
+              [max]="100"
+              [showButtons]="true"
+              [step]="5"
+              suffix=" pts"
+            ></p-inputNumber>
+          </label>
+        </div>
+
+        <div class="form__row">
+          <label class="form__field form__field--full">
+            <span class="form__label">Dirección</span>
+            <input
+              pInputText
+              type="text"
+              formControlName="address"
+              placeholder="Av. Corrientes 1234, CABA"
+            />
+          </label>
+        </div>
+      </fieldset>
+
+      <!-- Política de tolerancia -->
+      <fieldset class="form__section">
+        <legend>Política de tolerancia</legend>
+
+        <div class="form__row">
+          <label class="form__field">
+            <span class="form__label">Tolerancia % *</span>
+            <p-inputNumber
+              formControlName="percentTolerance"
+              [min]="0"
+              [max]="100"
+              [step]="0.5"
+              suffix=" %"
+              [showButtons]="true"
+            ></p-inputNumber>
+          </label>
+
+          <label class="form__field">
+            <span class="form__label">Moneda</span>
+            <p-dropdown
+              [options]="currencyOptions"
+              formControlName="currency"
+              optionLabel="label"
+              optionValue="value"
+              appendTo="body"
+            ></p-dropdown>
+          </label>
+        </div>
+
+        <div class="form__row">
+          <label class="form__field">
+            <span class="form__label">Auto-aprobación hasta</span>
+            <p-inputNumber
+              formControlName="autoApprovalUpTo"
+              [min]="0"
+              mode="currency"
+              [currency]="form.value.currency || 'USD'"
+              locale="en-US"
+              placeholder="Sin tope"
+            ></p-inputNumber>
+            <small class="form__hint">
+              Por debajo de este monto, los desvíos no requieren intervención.
+            </small>
+          </label>
+
+          <label class="form__field">
+            <span class="form__label">Criticidad estratégica</span>
+            <p-dropdown
+              [options]="criticalityOptions"
+              formControlName="criticality"
+              optionLabel="label"
+              optionValue="value"
+              appendTo="body"
+            ></p-dropdown>
+          </label>
+        </div>
+      </fieldset>
+    </div>
+
+    <footer class="form__footer">
+      <button
+        pButton
+        type="button"
+        label="Cancelar"
+        class="p-button-text"
+        (click)="closeDialog()"
+        [disabled]="saving()"
+      ></button>
+      <button
+        pButton
+        type="submit"
+        [label]="editingId() ? 'Guardar cambios' : 'Crear proveedor'"
+        icon="pi pi-check"
+        [loading]="saving()"
+      ></button>
+    </footer>
+  </form>
+</p-dialog>

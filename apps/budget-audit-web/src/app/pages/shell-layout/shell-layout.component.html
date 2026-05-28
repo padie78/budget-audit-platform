@@ -1,0 +1,16 @@
+<div class="layout">
+  <app-sidebar
+    [pendingAuditsCount]="pendingAuditsCount()"
+    [legalRisksCount]="legalRisksCount()"
+    userName="Diego Villarreal"
+    userRole="Administrador"
+  ></app-sidebar>
+
+  <div class="layout__main">
+    <app-topbar userName="Diego L." userRole="Admin Global"></app-topbar>
+
+    <section class="content">
+      <router-outlet></router-outlet>
+    </section>
+  </div>
+</div>
