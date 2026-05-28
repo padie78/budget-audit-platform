@@ -133,6 +133,11 @@
               CUIT / Tax ID <p-sortIcon field="taxId"></p-sortIcon>
             </div>
           </th>
+          <th pSortableColumn="entityId" style="min-width: 130px">
+            <div class="th">
+              Sede <p-sortIcon field="entityId"></p-sortIcon>
+            </div>
+          </th>
           <th pSortableColumn="fidelityScore" style="min-width: 160px">
             <div class="th">
               Fidelidad <p-sortIcon field="fidelityScore"></p-sortIcon>
@@ -172,6 +177,10 @@
             <span class="cell-mono">{{ row.taxId }}</span>
           </td>
 
+          <td>
+            <span class="cell-entity">{{ entityLabel(row.entityId) }}</span>
+          </td>
+
           <!-- Fidelity score como progress bar -->
           <td>
             <div class="cell-score">
@@ -201,30 +210,33 @@
 
           <td>
             <p-tag
-              *ngIf="row.riskLevel; else dash"
-              [value]="row.riskLevel"
+              *ngIf="row.riskLevel; else riskPlaceholder"
+              [value]="riskLabel(row.riskLevel)"
               [severity]="riskSeverity(row.riskLevel)"
               [rounded]="true"
             ></p-tag>
+            <ng-template #riskPlaceholder>
+              <p-tag value="Sin clasificar" severity="secondary" [rounded]="true"></p-tag>
+            </ng-template>
           </td>
 
           <td>
-            <span *ngIf="row.trend; else dash" class="cell-trend">
+            <span class="cell-trend">
               <i
                 class="pi"
                 [class.pi-arrow-up-right]="row.trend === 'IMPROVING'"
-                [class.pi-arrow-right]="row.trend === 'STABLE'"
+                [class.pi-arrow-right]="!row.trend || row.trend === 'STABLE'"
                 [class.pi-arrow-down-right]="row.trend === 'DEGRADING'"
                 [class.cell-trend--up]="row.trend === 'IMPROVING'"
-                [class.cell-trend--flat]="row.trend === 'STABLE'"
+                [class.cell-trend--flat]="!row.trend || row.trend === 'STABLE'"
                 [class.cell-trend--down]="row.trend === 'DEGRADING'"
               ></i>
-              <span>{{ row.trend }}</span>
+              <span>{{ trendLabel(row.trend) }}</span>
             </span>
           </td>
 
           <td>
-            <span class="cell-criticality" [attr.data-level]="row.criticality">
+            <span class="cell-criticality" [attr.data-level]="row.criticality || 'UNSET'">
               {{ criticalityLabel(row.criticality) }}
             </span>
           </td>
@@ -312,7 +324,21 @@
         </legend>
 
         <div class="form__row">
-          <label class="form__field form__field--full">
+          <label class="form__field">
+            <span class="form__label">Sede operativa <em>*</em></span>
+            <p-dropdown
+              [options]="entityOptions"
+              formControlName="entityId"
+              optionLabel="label"
+              optionValue="value"
+              appendTo="body"
+            ></p-dropdown>
+            <small class="form__hint">
+              Filtro de GSI multitenant — agrupa proveedores por unidad operativa.
+            </small>
+          </label>
+
+          <label class="form__field">
             <span class="form__label">Razón social <em>*</em></span>
             <input
               pInputText

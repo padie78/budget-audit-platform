@@ -125,7 +125,16 @@ export class SuppliersPortalPageComponent {
     { label: 'Estratégico', value: 'STRATEGIC' },
   ];
 
+  protected readonly entityOptions = [
+    { label: 'Global', value: 'GLOBAL' },
+    { label: 'Be\'er Sheva', value: 'BEER_SHEVA' },
+    { label: 'Buenos Aires', value: 'BUENOS_AIRES' },
+    { label: 'Tel Aviv', value: 'TEL_AVIV' },
+    { label: 'Madrid', value: 'MADRID' },
+  ];
+
   protected readonly form: FormGroup = this.fb.group({
+    entityId: ['GLOBAL', [Validators.required]],
     name: ['', [Validators.required, Validators.minLength(2)]],
     taxId: ['', [Validators.required, Validators.minLength(8)]],
     contactEmail: ['', [Validators.required, Validators.email]],
@@ -167,6 +176,7 @@ export class SuppliersPortalPageComponent {
   protected openCreate(): void {
     this.editingId.set(null);
     this.form.reset({
+      entityId: 'GLOBAL',
       name: '',
       taxId: '',
       contactEmail: '',
@@ -200,6 +210,7 @@ export class SuppliersPortalPageComponent {
             return;
           }
           this.form.reset({
+            entityId: s.entityId ?? 'GLOBAL',
             name: s.name,
             taxId: s.taxId,
             contactEmail: s.contactEmail,
@@ -247,6 +258,7 @@ export class SuppliersPortalPageComponent {
     this.saving.set(true);
 
     const commonInput = {
+      entityId: (v.entityId || 'GLOBAL').trim(),
       name: v.name.trim(),
       taxId: v.taxId.trim(),
       contactEmail: v.contactEmail.trim().toLowerCase(),
@@ -265,25 +277,31 @@ export class SuppliersPortalPageComponent {
               address: v.address || undefined,
             }
           : undefined,
-      strategicIntelligence: v.criticality
-        ? {
-            riskProfile: {
-              score: 80,
-              level: 'LOW' as const,
-              lastCheck: new Date().toISOString().slice(0, 10),
-            },
-            paymentStrategy: {
-              earlyPaymentPreferred: false,
-              discountTargetPercentage: 0,
-            },
-            diversityStatus: [] as string[],
-            criticalityIndex: v.criticality as
-              | 'LOW'
-              | 'MEDIUM'
-              | 'HIGH'
-              | 'STRATEGIC',
-          }
-        : undefined,
+      strategicIntelligence: {
+        riskProfile: {
+          score: 80,
+          level: 'LOW' as const,
+          lastCheck: new Date().toISOString().slice(0, 10),
+        },
+        paymentStrategy: {
+          earlyPaymentPreferred: false,
+          discountTargetPercentage: 0,
+        },
+        diversityStatus: [] as string[],
+        criticalityIndex: (v.criticality || 'MEDIUM') as
+          | 'LOW'
+          | 'MEDIUM'
+          | 'HIGH'
+          | 'STRATEGIC',
+      },
+      vendorPerformance: {
+        reliabilityScore: v.fidelityScore,
+        totalAuditedDocs: 0,
+        totalDisputesRaised: 0,
+        averageDisputeResolutionDays: 0,
+        slaDeliveryComplianceRate: 100,
+        trend: 'STABLE' as const,
+      },
     };
 
     const op$ = editingId
@@ -356,6 +374,40 @@ export class SuppliersPortalPageComponent {
       });
   }
 
+  protected entityLabel(entityId?: string): string {
+    if (!entityId) return 'Global';
+    const opt = this.entityOptions.find((o) => o.value === entityId);
+    return opt ? opt.label : entityId;
+  }
+
+  protected riskLabel(level?: string): string {
+    switch (level) {
+      case 'LOW':
+        return 'Bajo';
+      case 'MEDIUM':
+        return 'Medio';
+      case 'HIGH':
+        return 'Alto';
+      case 'CRITICAL':
+        return 'Crítico';
+      default:
+        return 'Sin clasificar';
+    }
+  }
+
+  protected trendLabel(trend?: string): string {
+    switch (trend) {
+      case 'IMPROVING':
+        return 'Mejorando';
+      case 'STABLE':
+        return 'Estable';
+      case 'DEGRADING':
+        return 'Cayendo';
+      default:
+        return 'Sin tendencia';
+    }
+  }
+
   protected riskSeverity(level?: string): 'success' | 'warning' | 'danger' | 'info' {
     switch (level) {
       case 'LOW':
@@ -395,7 +447,7 @@ export class SuppliersPortalPageComponent {
       case 'STRATEGIC':
         return 'Estratégico';
       default:
-        return '—';
+        return 'Sin definir';
     }
   }
 

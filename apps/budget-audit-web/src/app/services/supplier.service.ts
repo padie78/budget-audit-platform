@@ -51,6 +51,8 @@ interface GetSupplierResponse {
 
 const SUPPLIER_FIELDS = /* GraphQL */ `
   tenantId
+  entityId
+  versionId
   id
   name
   taxId

@@ -27,6 +27,7 @@ export class SupplierMapper {
 
     return {
       tenantId: snap.tenantId,
+      entityId: snap.entityId,
       id: snap.id,
       name: snap.name,
       taxId: snap.taxId,
@@ -40,6 +41,7 @@ export class SupplierMapper {
       },
       createdAt: snap.createdAt.toISOString(),
       updatedAt: snap.updatedAt.toISOString(),
+      versionId: snap.versionId,
 
       contactInfo: snap.contactInfo
         ? SupplierMapper.contactInfoToDto(snap.contactInfo)

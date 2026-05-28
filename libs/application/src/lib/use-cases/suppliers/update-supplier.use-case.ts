@@ -1,27 +1,33 @@
 import {
   Money,
-  Supplier,
+  PaymentStrategy,
+  RiskProfile,
   SmartThresholds,
+  StrategicIntelligence,
+  Supplier,
   SupplierNotFoundError,
   ThresholdPolicy,
+  VendorPerformance,
   type ISupplierRepository,
   type SupplierContactInfo,
 } from '@budget-audit/domain';
 import type {
   SmartThresholdsDto,
+  StrategicIntelligenceDto,
   SupplierContactInfoDto,
   ThresholdPolicyDto,
   UpdateSupplierInputDto,
+  VendorPerformanceDto,
 } from '@budget-audit/common';
 import type { ILogger } from '../../ports/logger.port';
 
 /* =============================================================================
- * UpdateSupplierUseCase — patch parcial de un proveedor existente.
+ * UpdateSupplierUseCase — patch parcial.
  *
- * Todos los campos del input (excepto `id`) son opcionales: solo se aplican
- * los que vienen definidos, mediante "merge" sobre el snapshot actual.
+ * Hace merge: solo aplica los campos definidos en el input; el resto preserva
+ * el snapshot existente. Incrementa `versionId` para alinear con el OCC del
+ * design canónico.
  * ============================================================================= */
-
 export interface UpdateSupplierDeps {
   supplierRepository: ISupplierRepository;
   logger: ILogger;
@@ -43,6 +49,7 @@ export class UpdateSupplierUseCase {
     const snap = existing.toJSON();
     const merged = Supplier.create({
       tenantId: snap.tenantId,
+      entityId: input.entityId?.trim() || snap.entityId,
       id: snap.id,
       name: input.name?.trim() ?? snap.name,
       taxId: input.taxId?.trim() ?? snap.taxId,
@@ -58,15 +65,22 @@ export class UpdateSupplierUseCase {
       smartThresholds: input.smartThresholds
         ? this.buildSmartThresholds(input.smartThresholds)
         : snap.smartThresholds,
-      strategicIntelligence: snap.strategicIntelligence,
-      vendorPerformance: snap.vendorPerformance,
+      strategicIntelligence: input.strategicIntelligence
+        ? this.buildStrategicIntelligence(input.strategicIntelligence)
+        : snap.strategicIntelligence,
+      vendorPerformance: input.vendorPerformance
+        ? this.buildVendorPerformance(input.vendorPerformance)
+        : snap.vendorPerformance,
+      versionId: (snap.versionId ?? 1) + 1,
       createdAt: snap.createdAt,
       updatedAt: new Date(),
     });
 
     await this.deps.supplierRepository.save(merged);
     this.deps.logger.info('[UpdateSupplier] proveedor actualizado', {
+      tenantId: merged.tenantId,
       supplierId: merged.id,
+      versionId: merged.versionId,
     });
     return merged;
   }
@@ -95,5 +109,27 @@ export class UpdateSupplierUseCase {
       s.defaultTolerancePercentage,
       s.categories,
     );
+  }
+
+  private buildStrategicIntelligence(
+    s: StrategicIntelligenceDto,
+  ): StrategicIntelligence {
+    return StrategicIntelligence.of({
+      riskProfile: RiskProfile.of({
+        score: s.riskProfile.score,
+        level: s.riskProfile.level,
+        lastCheck: new Date(s.riskProfile.lastCheck),
+      }),
+      paymentStrategy: PaymentStrategy.of({
+        earlyPaymentPreferred: s.paymentStrategy.earlyPaymentPreferred,
+        discountTargetPercentage: s.paymentStrategy.discountTargetPercentage,
+      }),
+      diversityStatus: [...s.diversityStatus],
+      criticalityIndex: s.criticalityIndex,
+    });
+  }
+
+  private buildVendorPerformance(v: VendorPerformanceDto): VendorPerformance {
+    return VendorPerformance.of(v);
   }
 }

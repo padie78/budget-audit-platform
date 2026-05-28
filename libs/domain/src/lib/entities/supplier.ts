@@ -22,6 +22,12 @@ export interface SupplierContactInfo {
 
 export interface SupplierProps {
   tenantId: string;
+  /**
+   * Sede operativa que opera con el proveedor (BEER_SHEVA, BUENOS_AIRES,
+   * GLOBAL, ...). Construye el `GSI1_PK = TENANT#<t>#ENTITY#<entityId>` del
+   * design canónico, permitiendo filtrar suppliers por sede.
+   */
+  entityId: string;
   id: string;
   name: string;
   taxId: string;
@@ -31,6 +37,8 @@ export interface SupplierProps {
   thresholdPolicy: ThresholdPolicy;
   createdAt: Date;
   updatedAt: Date;
+  /** Control de concurrencia optimista (OCC). Arranca en 1, +1 por save. */
+  versionId?: number;
 
   // ─────────── Extensiones enterprise (opcionales) ───────────
   contactInfo?: SupplierContactInfo;
@@ -38,6 +46,8 @@ export interface SupplierProps {
   vendorPerformance?: VendorPerformance;
   smartThresholds?: SmartThresholds;
 }
+
+export const DEFAULT_ENTITY_ID = 'GLOBAL';
 
 export class Supplier {
   private constructor(private props: SupplierProps) {}
@@ -54,10 +64,16 @@ export class Supplier {
         `fidelityScore fuera de rango 0..100: ${props.fidelityScore}`,
       );
     }
-    return new Supplier(props);
+    return new Supplier({
+      ...props,
+      entityId: props.entityId?.trim() || DEFAULT_ENTITY_ID,
+      versionId: props.versionId ?? 1,
+    });
   }
 
   get tenantId(): string { return this.props.tenantId; }
+  get entityId(): string { return this.props.entityId; }
+  get versionId(): number { return this.props.versionId ?? 1; }
   get id(): string { return this.props.id; }
   get name(): string { return this.props.name; }
   get taxId(): string { return this.props.taxId; }

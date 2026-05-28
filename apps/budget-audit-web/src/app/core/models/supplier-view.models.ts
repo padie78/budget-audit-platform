@@ -7,6 +7,7 @@ import type { SupplierDto } from '@budget-audit/common';
 
 export interface SupplierRowVm {
   id: string;
+  entityId: string;
   name: string;
   taxId: string;
   contactEmail: string;
@@ -28,6 +29,7 @@ export interface SupplierRowVm {
 export function toSupplierRowVm(dto: SupplierDto): SupplierRowVm {
   return {
     id: dto.id,
+    entityId: dto.entityId,
     name: dto.name,
     taxId: dto.taxId,
     contactEmail: dto.contactEmail,

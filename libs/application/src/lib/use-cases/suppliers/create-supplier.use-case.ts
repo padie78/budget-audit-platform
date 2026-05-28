@@ -1,32 +1,37 @@
 import {
+  DEFAULT_ENTITY_ID,
   Money,
-  Supplier,
+  PaymentStrategy,
+  RiskProfile,
   SmartThresholds,
+  StrategicIntelligence,
+  Supplier,
   ThresholdPolicy,
+  VendorPerformance,
   type ISupplierRepository,
   type SupplierContactInfo,
 } from '@budget-audit/domain';
 import type {
   CreateSupplierInputDto,
   SmartThresholdsDto,
+  StrategicIntelligenceDto,
   SupplierContactInfoDto,
   ThresholdPolicyDto,
+  VendorPerformanceDto,
 } from '@budget-audit/common';
 import type { IIdGenerator } from '../../ports/id-generator.port';
 import type { ILogger } from '../../ports/logger.port';
 
 /* =============================================================================
- * CreateSupplierUseCase — agrega un nuevo proveedor al catálogo (Portal de
- * Proveedores).
+ * CreateSupplierUseCase — agrega un nuevo proveedor al catálogo.
  *
  * Reglas:
- *   • `name`, `taxId`, `contactEmail` son obligatorios (validados también por
- *     el Aggregate Root al crear).
- *   • El id se genera vía `IIdGenerator` (UUID en infra real).
- *   • `thresholdPolicy` y `smartThresholds` son opcionales: si no vienen, se
- *     usa una política default sin tolerancia.
+ *   • `tenantId`, `name`, `taxId`, `contactEmail` son obligatorios.
+ *   • `entityId` (Sede) es opcional → default `GLOBAL`.
+ *   • Todos los bloques estratégicos (strategicIntelligence, vendorPerformance,
+ *     smartThresholds) son opcionales: si no vienen, se construyen defaults
+ *     enterprise sensatos para que la grilla nunca quede vacía.
  * ============================================================================= */
-
 export interface CreateSupplierDeps {
   supplierRepository: ISupplierRepository;
   idGenerator: IIdGenerator;
@@ -40,22 +45,38 @@ export class CreateSupplierUseCase {
     this.assertRequired(input);
 
     const now = new Date();
+    const policy = this.buildPolicy(input.thresholdPolicy);
     const supplier = Supplier.create({
       tenantId: input.tenantId,
+      entityId: input.entityId?.trim() || DEFAULT_ENTITY_ID,
       id: this.deps.idGenerator.generate(),
       name: input.name.trim(),
       taxId: input.taxId.trim(),
       contactEmail: input.contactEmail.trim().toLowerCase(),
       fidelityScore: input.fidelityScore ?? 80,
-      thresholdPolicy: this.buildPolicy(input.thresholdPolicy),
+      thresholdPolicy: policy,
       contactInfo: this.buildContactInfo(input.contactInfo),
-      smartThresholds: this.buildSmartThresholds(input.smartThresholds),
+      strategicIntelligence: this.buildStrategicIntelligence(
+        input.strategicIntelligence,
+        now,
+      ),
+      vendorPerformance: this.buildVendorPerformance(
+        input.vendorPerformance,
+        input.fidelityScore ?? 80,
+      ),
+      smartThresholds: this.buildSmartThresholds(
+        input.smartThresholds,
+        policy.percent,
+      ),
+      versionId: 1,
       createdAt: now,
       updatedAt: now,
     });
 
     await this.deps.supplierRepository.save(supplier);
     this.deps.logger.info('[CreateSupplier] proveedor creado', {
+      tenantId: supplier.tenantId,
+      entityId: supplier.entityId,
       supplierId: supplier.id,
       name: supplier.name,
     });
@@ -97,10 +118,60 @@ export class CreateSupplierUseCase {
     return { email: c.email, phone: c.phone, address: c.address };
   }
 
+  private buildStrategicIntelligence(
+    s: StrategicIntelligenceDto | undefined,
+    now: Date,
+  ): StrategicIntelligence {
+    const src = s ?? {
+      riskProfile: {
+        score: 80,
+        level: 'LOW' as const,
+        lastCheck: now.toISOString().slice(0, 10),
+      },
+      paymentStrategy: {
+        earlyPaymentPreferred: false,
+        discountTargetPercentage: 0,
+      },
+      diversityStatus: [],
+      criticalityIndex: 'MEDIUM' as const,
+    };
+    return StrategicIntelligence.of({
+      riskProfile: RiskProfile.of({
+        score: src.riskProfile.score,
+        level: src.riskProfile.level,
+        lastCheck: new Date(src.riskProfile.lastCheck),
+      }),
+      paymentStrategy: PaymentStrategy.of({
+        earlyPaymentPreferred: src.paymentStrategy.earlyPaymentPreferred,
+        discountTargetPercentage: src.paymentStrategy.discountTargetPercentage,
+      }),
+      diversityStatus: [...src.diversityStatus],
+      criticalityIndex: src.criticalityIndex,
+    });
+  }
+
+  private buildVendorPerformance(
+    v: VendorPerformanceDto | undefined,
+    fallbackReliability: number,
+  ): VendorPerformance {
+    const src = v ?? {
+      reliabilityScore: fallbackReliability / 100,
+      totalAuditedDocs: 0,
+      totalDisputesRaised: 0,
+      averageDisputeResolutionDays: 0,
+      slaDeliveryComplianceRate: 1,
+      trend: 'STABLE' as const,
+    };
+    return VendorPerformance.of(src);
+  }
+
   private buildSmartThresholds(
-    s?: SmartThresholdsDto,
-  ): SmartThresholds | undefined {
-    if (!s) return undefined;
+    s: SmartThresholdsDto | undefined,
+    fallbackPercent: number,
+  ): SmartThresholds {
+    if (!s) {
+      return SmartThresholds.fromRecord(fallbackPercent, {});
+    }
     return SmartThresholds.fromRecord(
       s.defaultTolerancePercentage,
       s.categories,

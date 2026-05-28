@@ -82,6 +82,8 @@ export interface SupplierContactInfoDto {
 
 export interface CreateSupplierInputDto {
   tenantId: string;
+  /** Sede operativa del supplier. Default 'GLOBAL' si no se especifica. */
+  entityId?: string;
   name: string;
   taxId: string;
   contactEmail: string;
@@ -96,6 +98,7 @@ export interface CreateSupplierInputDto {
 export interface UpdateSupplierInputDto {
   tenantId: string;
   id: string;
+  entityId?: string;
   name?: string;
   taxId?: string;
   contactEmail?: string;
@@ -115,6 +118,7 @@ export interface DeleteSupplierResultDto {
 
 export interface SupplierDto {
   tenantId: string;
+  entityId: string;
   id: string;
   name: string;
   taxId: string;
@@ -124,6 +128,8 @@ export interface SupplierDto {
   thresholdPolicy: ThresholdPolicyDto;
   createdAt: string;
   updatedAt: string;
+  /** Versión OCC del item en DynamoDB. */
+  versionId?: number;
 
   // ─────────── Extensiones del design ProcureTech OS (opcionales) ───────────
   contactInfo?: SupplierContactInfoDto;

@@ -88,12 +88,14 @@ type SmartThresholds {
 
 type Supplier {
   tenantId: ID!
+  entityId: ID!
   id: ID!
   name: String!
   taxId: String!
   contactEmail: String!
   fidelityScore: Float!
   thresholdPolicy: ThresholdPolicy!
+  versionId: Int
   createdAt: AWSDateTime!
   updatedAt: AWSDateTime!
 
@@ -216,6 +218,7 @@ input SmartThresholdsInput {
 
 input CreateSupplierInput {
   tenantId: ID!
+  entityId: ID
   name: String!
   taxId: String!
   contactEmail: String!
@@ -230,6 +233,7 @@ input CreateSupplierInput {
 input UpdateSupplierInput {
   tenantId: ID!
   id: ID!
+  entityId: ID
   name: String
   taxId: String
   contactEmail: String
