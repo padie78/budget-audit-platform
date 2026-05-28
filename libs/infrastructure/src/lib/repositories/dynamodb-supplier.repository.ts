@@ -43,6 +43,7 @@ interface SupplierItem {
   PK: string;
   SK: string;
   entityType: typeof EntityType.Supplier;
+  tenantId: string;
   id: string;
   name: string;
   taxId: string;
@@ -74,11 +75,14 @@ export class DynamoDbSupplierRepository implements ISupplierRepository {
     }
   }
 
-  async findById(supplierId: string): Promise<Supplier | null> {
+  async findById(
+    tenantId: string,
+    supplierId: string,
+  ): Promise<Supplier | null> {
     const res = await this.client.send(
       new GetCommand({
         TableName: this.tableName,
-        Key: DynamoKeys.supplier(supplierId),
+        Key: DynamoKeys.supplier(tenantId, supplierId),
       }),
     );
     if (!res.Item) return null;
@@ -87,12 +91,13 @@ export class DynamoDbSupplierRepository implements ISupplierRepository {
 
   async save(supplier: Supplier): Promise<void> {
     const dto = SupplierMapper.toDto(supplier);
-    const keys = DynamoKeys.supplier(supplier.id);
+    const keys = DynamoKeys.supplier(supplier.tenantId, supplier.id);
 
     const item: SupplierItem = {
       PK: keys.PK,
       SK: keys.SK,
       entityType: EntityType.Supplier,
+      tenantId: dto.tenantId,
       id: dto.id,
       name: dto.name,
       taxId: dto.taxId,
@@ -115,25 +120,28 @@ export class DynamoDbSupplierRepository implements ISupplierRepository {
     );
   }
 
-  async delete(supplierId: string): Promise<void> {
+  async delete(tenantId: string, supplierId: string): Promise<void> {
     await this.client.send(
       new DeleteCommand({
         TableName: this.tableName,
-        Key: DynamoKeys.supplier(supplierId),
+        Key: DynamoKeys.supplier(tenantId, supplierId),
       }),
     );
   }
 
-  async listAll(limit?: number): Promise<Supplier[]> {
+  async listAll(tenantId: string, limit?: number): Promise<Supplier[]> {
     const items: SupplierItem[] = [];
     let lastEvaluatedKey: Record<string, unknown> | undefined;
+    const pkPrefix = DynamoKeys.tenantSupplierPrefix(tenantId);
 
     do {
       const res = await this.client.send(
         new ScanCommand({
           TableName: this.tableName,
-          FilterExpression: 'SK = :sk AND entityType = :type',
+          FilterExpression:
+            'begins_with(PK, :pkPrefix) AND SK = :sk AND entityType = :type',
           ExpressionAttributeValues: {
+            ':pkPrefix': pkPrefix,
             ':sk': KeyPrefix.Metadata,
             ':type': EntityType.Supplier,
           },
@@ -218,6 +226,7 @@ export class DynamoDbSupplierRepository implements ISupplierRepository {
       : undefined;
 
     return Supplier.create({
+      tenantId: item.tenantId,
       id: item.id,
       name: item.name,
       taxId: item.taxId,

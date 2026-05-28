@@ -75,6 +75,7 @@ export interface ContractMetadataDto {
 }
 
 export interface ContractDto {
+  tenantId: string;
   id: string;
   supplierId: string;
   effectiveFrom: string;

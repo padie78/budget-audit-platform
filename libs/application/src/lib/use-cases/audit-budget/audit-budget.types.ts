@@ -1,6 +1,7 @@
 import type { BudgetDto } from '@budget-audit/common';
 
 export interface AuditBudgetCommand {
+  tenantId: string;
   supplierId: string;
   s3Url: string;
   contractId?: string;

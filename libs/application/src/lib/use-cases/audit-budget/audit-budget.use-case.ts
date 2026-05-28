@@ -49,16 +49,25 @@ export class AuditBudgetUseCase {
 
     logger.info('Audit started', {
       auditId,
+      tenantId: command.tenantId,
       supplierId: command.supplierId,
       s3Url: command.s3Url,
       hasPo: !!command.poS3Url,
       hasInvoice: !!command.invoiceS3Url,
     });
 
-    const supplier = await this.deps.supplierRepository.findById(command.supplierId);
+    if (!command.tenantId?.trim()) {
+      throw new Error('tenantId es obligatorio en AuditBudgetCommand.');
+    }
+
+    const supplier = await this.deps.supplierRepository.findById(
+      command.tenantId,
+      command.supplierId,
+    );
     if (!supplier) throw new SupplierNotFoundError(command.supplierId);
 
     const budget = Budget.initialize({
+      tenantId: command.tenantId,
       id: auditId,
       supplierId: command.supplierId,
       s3Url: command.s3Url,
@@ -80,8 +89,15 @@ export class AuditBudgetUseCase {
       }
 
       const contract = command.contractId
-        ? await this.deps.contractRepository.findById(command.supplierId, command.contractId)
-        : await this.deps.contractRepository.findActiveBySupplier(command.supplierId);
+        ? await this.deps.contractRepository.findById(
+            command.tenantId,
+            command.supplierId,
+            command.contractId,
+          )
+        : await this.deps.contractRepository.findActiveBySupplier(
+            command.tenantId,
+            command.supplierId,
+          );
 
       const purchaseOrder = command.poS3Url
         ? (await this.deps.aiExtractorService.extract({

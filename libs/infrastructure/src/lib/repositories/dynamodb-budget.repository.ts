@@ -63,6 +63,7 @@ export class DynamoDbBudgetRepository implements IBudgetRepository {
     const dto = BudgetMapper.toDto(budget);
 
     const keys = DynamoKeys.audit(
+      snap.tenantId,
       snap.supplierId,
       snap.id,
       snap.status,
@@ -80,12 +81,16 @@ export class DynamoDbBudgetRepository implements IBudgetRepository {
     );
   }
 
-  async findById(supplierId: string, budgetId: string): Promise<Budget | null> {
+  async findById(
+    tenantId: string,
+    supplierId: string,
+    budgetId: string,
+  ): Promise<Budget | null> {
     const res = await this.client.send(
       new GetCommand({
         TableName: this.tableName,
         Key: {
-          PK: DynamoKeys.supplier(supplierId).PK,
+          PK: DynamoKeys.supplierPK(tenantId, supplierId),
           SK: `${KeyPrefix.Audit}${budgetId}`,
         },
       }),
@@ -94,13 +99,17 @@ export class DynamoDbBudgetRepository implements IBudgetRepository {
     return this.toEntity(res.Item as BudgetItem);
   }
 
-  async listBySupplier(supplierId: string, limit = 50): Promise<Budget[]> {
+  async listBySupplier(
+    tenantId: string,
+    supplierId: string,
+    limit = 50,
+  ): Promise<Budget[]> {
     const res = await this.client.send(
       new QueryCommand({
         TableName: this.tableName,
         KeyConditionExpression: 'PK = :pk AND begins_with(SK, :sk)',
         ExpressionAttributeValues: {
-          ':pk': DynamoKeys.supplier(supplierId).PK,
+          ':pk': DynamoKeys.supplierPK(tenantId, supplierId),
           ':sk': KeyPrefix.Audit,
         },
         Limit: limit,
@@ -305,6 +314,7 @@ export class DynamoDbBudgetRepository implements IBudgetRepository {
       : undefined;
 
     return Budget.rehydrate({
+      tenantId: item.tenantId,
       id: item.id,
       supplierId: item.supplierId,
       contractId: item.contractId,

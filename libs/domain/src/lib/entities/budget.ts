@@ -92,6 +92,7 @@ export interface BudgetMetadata {
 }
 
 export interface BudgetProps {
+  tenantId: string;
   id: string;
   supplierId: string;
   contractId: string | null;
@@ -140,6 +141,7 @@ export class Budget {
   private constructor(private props: BudgetProps) {}
 
   static initialize(params: {
+    tenantId: string;
     id: string;
     supplierId: string;
     s3Url: string;
@@ -148,8 +150,12 @@ export class Budget {
     purchaseOrderReference?: string;
     createdAt?: Date;
   }): Budget {
+    if (!params.tenantId?.trim()) {
+      throw new Error('tenantId es obligatorio en Budget (multitenant).');
+    }
     const now = params.createdAt ?? new Date();
     return new Budget({
+      tenantId: params.tenantId,
       id: params.id,
       supplierId: params.supplierId,
       contractId: params.contractId ?? null,
@@ -320,6 +326,7 @@ export class Budget {
     return AuditDecision.AutoApproved;
   }
 
+  get tenantId(): string { return this.props.tenantId; }
   get id(): string { return this.props.id; }
   get supplierId(): string { return this.props.supplierId; }
   get contractId(): string | null { return this.props.contractId; }

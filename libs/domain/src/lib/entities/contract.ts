@@ -41,6 +41,7 @@ export interface ContractMetadata {
 }
 
 export interface ContractProps {
+  tenantId: string;
   id: string;
   supplierId: string;
   effectiveFrom: Date;
@@ -64,12 +65,16 @@ export class Contract {
   private constructor(private props: ContractProps) {}
 
   static create(props: ContractProps): Contract {
+    if (!props.tenantId?.trim()) {
+      throw new Error('tenantId es obligatorio en Contract (multitenant).');
+    }
     if (props.agreedItems.size === 0) {
       throw new Error('El contrato debe contener al menos un ítem pactado.');
     }
     return new Contract(props);
   }
 
+  get tenantId(): string { return this.props.tenantId; }
   get id(): string { return this.props.id; }
   get supplierId(): string { return this.props.supplierId; }
   get currency(): string { return this.props.currency; }

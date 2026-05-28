@@ -15,8 +15,12 @@ export interface ListSuppliersDeps {
 export class ListSuppliersUseCase {
   constructor(private readonly deps: ListSuppliersDeps) {}
 
-  async execute(limit?: number): Promise<Supplier[]> {
-    const suppliers = await this.deps.supplierRepository.listAll(limit);
+  async execute(tenantId: string, limit?: number): Promise<Supplier[]> {
+    if (!tenantId?.trim()) throw new Error('tenantId es obligatorio.');
+    const suppliers = await this.deps.supplierRepository.listAll(
+      tenantId,
+      limit,
+    );
     return [...suppliers].sort((a, b) => a.name.localeCompare(b.name));
   }
 }

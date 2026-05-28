@@ -202,6 +202,7 @@ export interface BudgetMetadataDto {
 }
 
 export interface BudgetDto {
+  tenantId: string;
   id: string;
   supplierId: string;
   contractId: string | null;

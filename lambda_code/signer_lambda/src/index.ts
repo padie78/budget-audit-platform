@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 interface SignUploadArgs {
   input: {
+    tenantId: string;
     supplierId: string;
     fileName: string;
     contentType: string;
@@ -38,17 +39,17 @@ export const handler: AppSyncResolverHandler<
 > = async (event) => {
   if (!BUCKET) throw new Error('BUDGETS_BUCKET no configurado.');
 
-  const { supplierId, fileName, contentType } = event.arguments.input;
+  const { tenantId, supplierId, fileName, contentType } = event.arguments.input;
 
-  if (!supplierId || !fileName) {
-    throw new Error('supplierId y fileName son requeridos.');
+  if (!tenantId || !supplierId || !fileName) {
+    throw new Error('tenantId, supplierId y fileName son requeridos.');
   }
   if (!ALLOWED_CONTENT_TYPES.has(contentType)) {
     throw new Error(`Content-Type no permitido: ${contentType}`);
   }
 
   const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
-  const key = `uploads/${supplierId}/${Date.now()}-${uuidv4()}-${safeName}`;
+  const key = `uploads/${tenantId}/${supplierId}/${Date.now()}-${uuidv4()}-${safeName}`;
 
   const s3 = getS3Client();
   const command = new PutObjectCommand({

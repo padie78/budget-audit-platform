@@ -87,6 +87,7 @@ type SmartThresholds {
 }
 
 type Supplier {
+  tenantId: ID!
   id: ID!
   name: String!
   taxId: String!
@@ -103,6 +104,7 @@ type Supplier {
 }
 
 type DeleteSupplierResult {
+  tenantId: ID!
   id: ID!
   deleted: Boolean!
 }
@@ -138,6 +140,7 @@ type BudgetAlert {
 }
 
 type Budget {
+  tenantId: ID!
   id: ID!
   supplierId: ID!
   contractId: ID
@@ -212,6 +215,7 @@ input SmartThresholdsInput {
 }
 
 input CreateSupplierInput {
+  tenantId: ID!
   name: String!
   taxId: String!
   contactEmail: String!
@@ -224,6 +228,7 @@ input CreateSupplierInput {
 }
 
 input UpdateSupplierInput {
+  tenantId: ID!
   id: ID!
   name: String
   taxId: String
@@ -237,12 +242,14 @@ input UpdateSupplierInput {
 }
 
 input AuditBudgetInput {
+  tenantId: ID!
   supplierId: ID!
   s3Url: String!
   contractId: ID
 }
 
 input SignUploadInput {
+  tenantId: ID!
   supplierId: ID!
   fileName: String!
   contentType: String!
@@ -251,10 +258,10 @@ input SignUploadInput {
 # ─────────── Operations ───────────
 
 type Query {
-  getBudget(supplierId: ID!, budgetId: ID!): Budget
-  listBudgetsBySupplier(supplierId: ID!, limit: Int): [Budget!]!
-  getSupplier(supplierId: ID!): Supplier
-  listSuppliers(limit: Int): [Supplier!]!
+  getBudget(tenantId: ID!, supplierId: ID!, budgetId: ID!): Budget
+  listBudgetsBySupplier(tenantId: ID!, supplierId: ID!, limit: Int): [Budget!]!
+  getSupplier(tenantId: ID!, supplierId: ID!): Supplier
+  listSuppliers(tenantId: ID!, limit: Int): [Supplier!]!
 }
 
 type Mutation {
@@ -265,7 +272,7 @@ type Mutation {
   # Portal de proveedores
   createSupplier(input: CreateSupplierInput!): Supplier!
   updateSupplier(input: UpdateSupplierInput!): Supplier!
-  deleteSupplier(id: ID!): DeleteSupplierResult!
+  deleteSupplier(tenantId: ID!, id: ID!): DeleteSupplierResult!
 
   # Mutations internas usadas por la propia Lambda para emitir eventos
   # que despiertan a las subscriptions. NO usar desde el frontend.
@@ -274,9 +281,9 @@ type Mutation {
 }
 
 type Subscription {
-  onAuditCompleted(supplierId: ID!): Budget
+  onAuditCompleted(tenantId: ID!, supplierId: ID!): Budget
     @aws_subscribe(mutations: ["publishAuditCompleted"])
 
-  onAuditFailed(supplierId: ID!): Budget
+  onAuditFailed(tenantId: ID!, supplierId: ID!): Budget
     @aws_subscribe(mutations: ["publishAuditFailed"])
 }

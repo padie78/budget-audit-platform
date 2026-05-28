@@ -31,11 +31,18 @@ export class UpdateSupplierUseCase {
   constructor(private readonly deps: UpdateSupplierDeps) {}
 
   async execute(input: UpdateSupplierInputDto): Promise<Supplier> {
-    const existing = await this.deps.supplierRepository.findById(input.id);
+    if (!input.tenantId?.trim()) {
+      throw new Error('tenantId es obligatorio.');
+    }
+    const existing = await this.deps.supplierRepository.findById(
+      input.tenantId,
+      input.id,
+    );
     if (!existing) throw new SupplierNotFoundError(input.id);
 
     const snap = existing.toJSON();
     const merged = Supplier.create({
+      tenantId: snap.tenantId,
       id: snap.id,
       name: input.name?.trim() ?? snap.name,
       taxId: input.taxId?.trim() ?? snap.taxId,

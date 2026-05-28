@@ -52,23 +52,26 @@ interface UpdateSupplierGraphQLInput
 }
 
 type ResolverArgs =
-  | { fieldName: 'getBudget'; args: { supplierId: string; budgetId: string } }
+  | {
+      fieldName: 'getBudget';
+      args: { tenantId: string; supplierId: string; budgetId: string };
+    }
   | {
       fieldName: 'listBudgetsBySupplier';
-      args: { supplierId: string; limit?: number };
+      args: { tenantId: string; supplierId: string; limit?: number };
     }
-  | { fieldName: 'getSupplier'; args: { supplierId: string } }
-  | { fieldName: 'listSuppliers'; args: { limit?: number } }
+  | { fieldName: 'getSupplier'; args: { tenantId: string; supplierId: string } }
+  | { fieldName: 'listSuppliers'; args: { tenantId: string; limit?: number } }
   | { fieldName: 'createSupplier'; args: { input: CreateSupplierGraphQLInput } }
   | { fieldName: 'updateSupplier'; args: { input: UpdateSupplierGraphQLInput } }
-  | { fieldName: 'deleteSupplier'; args: { id: string } }
+  | { fieldName: 'deleteSupplier'; args: { tenantId: string; id: string } }
   | {
       fieldName: 'getContract';
-      args: { supplierId: string; contractId: string };
+      args: { tenantId: string; supplierId: string; contractId: string };
     }
   | {
       fieldName: 'getActiveContract';
-      args: { supplierId: string; at?: string };
+      args: { tenantId: string; supplierId: string; at?: string };
     };
 
 /* ─────────── Helpers de mapeo AppSync ↔ Dominio ─────────── */
@@ -155,6 +158,7 @@ export const handler: AppSyncResolverHandler<
   switch (op.fieldName) {
     case 'getBudget': {
       const budget = await budgets().findById(
+        op.args.tenantId,
         op.args.supplierId,
         op.args.budgetId,
       );
@@ -163,6 +167,7 @@ export const handler: AppSyncResolverHandler<
 
     case 'listBudgetsBySupplier': {
       const list = await budgets().listBySupplier(
+        op.args.tenantId,
         op.args.supplierId,
         op.args.limit,
       );
@@ -170,7 +175,10 @@ export const handler: AppSyncResolverHandler<
     }
 
     case 'getSupplier': {
-      const supplier = await suppliers().findById(op.args.supplierId);
+      const supplier = await suppliers().findById(
+        op.args.tenantId,
+        op.args.supplierId,
+      );
       return supplier ? supplierDtoToGraphQL(SupplierMapper.toDto(supplier)) : null;
     }
 
@@ -178,7 +186,7 @@ export const handler: AppSyncResolverHandler<
       const useCase = new ListSuppliersUseCase({
         supplierRepository: suppliers(),
       });
-      const list = await useCase.execute(op.args.limit);
+      const list = await useCase.execute(op.args.tenantId, op.args.limit);
       return list.map((s) => supplierDtoToGraphQL(SupplierMapper.toDto(s)));
     }
 
@@ -206,11 +214,12 @@ export const handler: AppSyncResolverHandler<
         supplierRepository: suppliers(),
         logger,
       });
-      return useCase.execute(op.args.id);
+      return useCase.execute(op.args.tenantId, op.args.id);
     }
 
     case 'getContract': {
       const contract = await contracts().findById(
+        op.args.tenantId,
         op.args.supplierId,
         op.args.contractId,
       );
@@ -220,6 +229,7 @@ export const handler: AppSyncResolverHandler<
     case 'getActiveContract': {
       const at = op.args.at ? new Date(op.args.at) : new Date();
       const contract = await contracts().findActiveBySupplier(
+        op.args.tenantId,
         op.args.supplierId,
         at,
       );

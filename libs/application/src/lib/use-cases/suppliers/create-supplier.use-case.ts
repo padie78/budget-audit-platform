@@ -41,6 +41,7 @@ export class CreateSupplierUseCase {
 
     const now = new Date();
     const supplier = Supplier.create({
+      tenantId: input.tenantId,
       id: this.deps.idGenerator.generate(),
       name: input.name.trim(),
       taxId: input.taxId.trim(),
@@ -63,6 +64,9 @@ export class CreateSupplierUseCase {
   }
 
   private assertRequired(input: CreateSupplierInputDto): void {
+    if (!input.tenantId?.trim()) {
+      throw new Error('tenantId es obligatorio.');
+    }
     if (!input.name?.trim()) throw new Error('El nombre es obligatorio.');
     if (!input.taxId?.trim()) throw new Error('El CUIT/Tax ID es obligatorio.');
     if (!input.contactEmail?.trim()) {

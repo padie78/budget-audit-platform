@@ -81,6 +81,7 @@ export interface SupplierContactInfoDto {
  * ============================================================================= */
 
 export interface CreateSupplierInputDto {
+  tenantId: string;
   name: string;
   taxId: string;
   contactEmail: string;
@@ -93,6 +94,7 @@ export interface CreateSupplierInputDto {
 }
 
 export interface UpdateSupplierInputDto {
+  tenantId: string;
   id: string;
   name?: string;
   taxId?: string;
@@ -106,11 +108,13 @@ export interface UpdateSupplierInputDto {
 }
 
 export interface DeleteSupplierResultDto {
+  tenantId: string;
   id: string;
   deleted: boolean;
 }
 
 export interface SupplierDto {
+  tenantId: string;
   id: string;
   name: string;
   taxId: string;

@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { inject, Injectable } from '@angular/core';
 import { generateClient, type GraphQLSubscription } from 'aws-amplify/api';
 import { from, map, Observable } from 'rxjs';
 import type {
@@ -6,6 +6,7 @@ import type {
   BudgetDto,
   SupplierDto,
 } from '@budget-audit/common';
+import { TenantContextService } from '../core/tenant/tenant.context';
 
 export interface SignedUploadUrl {
   uploadUrl: string;
@@ -36,6 +37,7 @@ interface OnAuditCompletedResponse {
 const AUDIT_BUDGET = /* GraphQL */ `
   mutation AuditBudget($input: AuditBudgetInput!) {
     auditBudget(input: $input) {
+      tenantId
       id
       supplierId
       contractId
@@ -86,8 +88,9 @@ const SIGN_UPLOAD = /* GraphQL */ `
 `;
 
 const GET_BUDGET = /* GraphQL */ `
-  query GetBudget($supplierId: ID!, $budgetId: ID!) {
-    getBudget(supplierId: $supplierId, budgetId: $budgetId) {
+  query GetBudget($tenantId: ID!, $supplierId: ID!, $budgetId: ID!) {
+    getBudget(tenantId: $tenantId, supplierId: $supplierId, budgetId: $budgetId) {
+      tenantId
       id
       status
       totalDeviationAmount
@@ -102,8 +105,13 @@ const GET_BUDGET = /* GraphQL */ `
 `;
 
 const LIST_BUDGETS = /* GraphQL */ `
-  query ListBudgetsBySupplier($supplierId: ID!, $limit: Int) {
-    listBudgetsBySupplier(supplierId: $supplierId, limit: $limit) {
+  query ListBudgetsBySupplier($tenantId: ID!, $supplierId: ID!, $limit: Int) {
+    listBudgetsBySupplier(
+      tenantId: $tenantId
+      supplierId: $supplierId
+      limit: $limit
+    ) {
+      tenantId
       id
       status
       createdAt
@@ -114,8 +122,9 @@ const LIST_BUDGETS = /* GraphQL */ `
 `;
 
 const GET_SUPPLIER = /* GraphQL */ `
-  query GetSupplier($supplierId: ID!) {
-    getSupplier(supplierId: $supplierId) {
+  query GetSupplier($tenantId: ID!, $supplierId: ID!) {
+    getSupplier(tenantId: $tenantId, supplierId: $supplierId) {
+      tenantId
       id
       name
       taxId
@@ -127,8 +136,9 @@ const GET_SUPPLIER = /* GraphQL */ `
 `;
 
 const ON_AUDIT_COMPLETED = /* GraphQL */ `
-  subscription OnAuditCompleted($supplierId: ID!) {
-    onAuditCompleted(supplierId: $supplierId) {
+  subscription OnAuditCompleted($tenantId: ID!, $supplierId: ID!) {
+    onAuditCompleted(tenantId: $tenantId, supplierId: $supplierId) {
+      tenantId
       id
       supplierId
       status
@@ -164,16 +174,23 @@ const ON_AUDIT_COMPLETED = /* GraphQL */ `
  * Único punto de contacto del frontend con AppSync. Centraliza queries,
  * mutations y subscriptions. Los componentes UI nunca usan el cliente
  * GraphQL directamente: hablan con este servicio mediante Observables.
+ *
+ * Multitenant: el tenant actual viaja como argumento explícito en cada
+ * operación, resuelto desde `TenantContextService`.
  */
 @Injectable({ providedIn: 'root' })
 export class BudgetService {
   private readonly client = generateClient();
+  private readonly tenantCtx = inject(TenantContextService);
 
-  auditBudget(input: AuditBudgetInput): Observable<BudgetDto> {
+  auditBudget(
+    input: Omit<AuditBudgetInput, 'tenantId'>,
+  ): Observable<BudgetDto> {
+    const tenantId = this.tenantCtx.current();
     return from(
       this.client.graphql<AuditBudgetResponse>({
         query: AUDIT_BUDGET,
-        variables: { input },
+        variables: { input: { ...input, tenantId } },
       }),
     ).pipe(map((res) => res.data.auditBudget));
   }
@@ -183,37 +200,44 @@ export class BudgetService {
     fileName: string;
     contentType: string;
   }): Observable<SignedUploadUrl> {
+    const tenantId = this.tenantCtx.current();
     return from(
       this.client.graphql<SignUploadResponse>({
         query: SIGN_UPLOAD,
-        variables: { input },
+        variables: { input: { ...input, tenantId } },
       }),
     ).pipe(map((res) => res.data.signUpload));
   }
 
   getBudget(supplierId: string, budgetId: string): Observable<BudgetDto | null> {
+    const tenantId = this.tenantCtx.current();
     return from(
       this.client.graphql<GetBudgetResponse>({
         query: GET_BUDGET,
-        variables: { supplierId, budgetId },
+        variables: { tenantId, supplierId, budgetId },
       }),
     ).pipe(map((res) => res.data.getBudget));
   }
 
-  listBudgetsBySupplier(supplierId: string, limit = 50): Observable<BudgetDto[]> {
+  listBudgetsBySupplier(
+    supplierId: string,
+    limit = 50,
+  ): Observable<BudgetDto[]> {
+    const tenantId = this.tenantCtx.current();
     return from(
       this.client.graphql<ListBudgetsResponse>({
         query: LIST_BUDGETS,
-        variables: { supplierId, limit },
+        variables: { tenantId, supplierId, limit },
       }),
     ).pipe(map((res) => res.data.listBudgetsBySupplier));
   }
 
   getSupplier(supplierId: string): Observable<SupplierDto | null> {
+    const tenantId = this.tenantCtx.current();
     return from(
       this.client.graphql<GetSupplierResponse>({
         query: GET_SUPPLIER,
-        variables: { supplierId },
+        variables: { tenantId, supplierId },
       }),
     ).pipe(map((res) => res.data.getSupplier));
   }
@@ -224,11 +248,12 @@ export class BudgetService {
    * cada emisión a estado de la vista.
    */
   onAuditCompleted(supplierId: string): Observable<BudgetDto> {
+    const tenantId = this.tenantCtx.current();
     const observable = this.client.graphql<
       GraphQLSubscription<OnAuditCompletedResponse>
     >({
       query: ON_AUDIT_COMPLETED,
-      variables: { supplierId },
+      variables: { tenantId, supplierId },
     });
 
     return new Observable<BudgetDto>((subscriber) => {

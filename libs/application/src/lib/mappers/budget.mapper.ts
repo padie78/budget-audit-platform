@@ -34,6 +34,7 @@ export class BudgetMapper {
       snap.extractedBudget?.currency ?? snap.totalDeviation?.currency ?? 'USD';
 
     return {
+      tenantId: snap.tenantId,
       id: snap.id,
       supplierId: snap.supplierId,
       contractId: snap.contractId,

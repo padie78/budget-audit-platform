@@ -26,6 +26,7 @@ export class SupplierMapper {
       'USD';
 
     return {
+      tenantId: snap.tenantId,
       id: snap.id,
       name: snap.name,
       taxId: snap.taxId,

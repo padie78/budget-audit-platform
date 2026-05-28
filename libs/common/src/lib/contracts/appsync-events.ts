@@ -6,6 +6,7 @@ import type { BudgetDto } from '../dto/budget.dto';
  */
 
 export interface AuditBudgetInput {
+  tenantId: string;
   supplierId: string;
   s3Url: string;
   contractId?: string;

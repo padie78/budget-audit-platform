@@ -1,30 +1,26 @@
 import type { Supplier } from '../entities/supplier';
 
 /* =============================================================================
- * ISupplierRepository — puerto del agregado Supplier.
+ * ISupplierRepository — puerto del agregado Supplier (multitenant).
  *
- * Define el contrato CRUD + listado paginado que cualquier infraestructura
- * concreta (DynamoDB, in-memory para tests, etc.) debe implementar.
- *
- * Las operaciones lanzan errores de dominio (`SupplierNotFoundError`) cuando
- * corresponde, en vez de devolver `null` para los caminos de error críticos
- * (update/delete sobre id inexistente).
+ * Cada operación está scopeada por `tenantId`. La implementación concreta
+ * construye las DynamoDB keys con prefijo `TENANT#<t>#SUPPLIER#<s>` para
+ * garantizar aislamiento físico entre tenants.
  * ============================================================================= */
 export interface ISupplierRepository {
-  findById(supplierId: string): Promise<Supplier | null>;
+  findById(tenantId: string, supplierId: string): Promise<Supplier | null>;
 
   /** Persiste un Supplier (insert o replace por PK/SK). */
   save(supplier: Supplier): Promise<void>;
 
-  /** Elimina por id. No falla si no existe (idempotente). */
-  delete(supplierId: string): Promise<void>;
+  /** Elimina por (tenantId, supplierId). Idempotente. */
+  delete(tenantId: string, supplierId: string): Promise<void>;
 
   /**
-   * Devuelve todos los suppliers del sistema. Para MVP usa scan con filter
-   * sobre `SK = METADATA`; cuando el catálogo escale, conviene mover esto a
-   * un GSI dedicado.
+   * Lista los suppliers del tenant. MVP usa scan con `begins_with(PK, ...)`
+   * más filter `SK = METADATA`; a escala migrar a GSI dedicado por tenant.
    */
-  listAll(limit?: number): Promise<Supplier[]>;
+  listAll(tenantId: string, limit?: number): Promise<Supplier[]>;
 }
 
 export const SUPPLIER_REPOSITORY = Symbol('ISupplierRepository');

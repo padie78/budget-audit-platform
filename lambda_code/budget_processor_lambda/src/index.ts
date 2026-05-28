@@ -7,7 +7,7 @@ interface AuditBudgetArgs {
 }
 
 interface DraftDisputeArgs {
-  input: { supplierId: string; budgetId: string };
+  input: { tenantId: string; supplierId: string; budgetId: string };
 }
 
 /**
@@ -28,11 +28,12 @@ export const handler: AppSyncResolverHandler<
 
   if (fieldName === 'auditBudget') {
     const useCase = buildAuditBudgetUseCase();
-    if (!input?.supplierId || !input?.s3Url) {
-      throw new Error('supplierId y s3Url son requeridos.');
+    if (!input?.tenantId || !input?.supplierId || !input?.s3Url) {
+      throw new Error('tenantId, supplierId y s3Url son requeridos.');
     }
 
     const result = await useCase.execute({
+      tenantId: input.tenantId,
       supplierId: input.supplierId,
       s3Url: input.s3Url,
       contractId: input.contractId,
@@ -47,11 +48,14 @@ export const handler: AppSyncResolverHandler<
 
   if (fieldName === 'draftDisputeEmail') {
     const useCase = buildDraftDisputeUseCase();
-    if (!input?.supplierId || !input?.budgetId) {
-      throw new Error('supplierId y budgetId son requeridos.');
+    if (!input?.tenantId || !input?.supplierId || !input?.budgetId) {
+      throw new Error('tenantId, supplierId y budgetId son requeridos.');
     }
-    const res = await useCase.execute({ supplierId: input.supplierId, budgetId: input.budgetId });
-    // AppSync schema devolvería otro type; en MVP lo resolvemos en el schema en siguiente paso.
+    const res = await useCase.execute({
+      tenantId: input.tenantId,
+      supplierId: input.supplierId,
+      budgetId: input.budgetId,
+    });
     return (res as any).email;
   }
 

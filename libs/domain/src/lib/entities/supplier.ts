@@ -21,6 +21,7 @@ export interface SupplierContactInfo {
 }
 
 export interface SupplierProps {
+  tenantId: string;
   id: string;
   name: string;
   taxId: string;
@@ -42,6 +43,9 @@ export class Supplier {
   private constructor(private props: SupplierProps) {}
 
   static create(props: SupplierProps): Supplier {
+    if (!props.tenantId?.trim()) {
+      throw new Error('tenantId es obligatorio en Supplier (multitenant).');
+    }
     if (!props.name.trim()) {
       throw new Error('El nombre del proveedor es obligatorio.');
     }
@@ -53,6 +57,7 @@ export class Supplier {
     return new Supplier(props);
   }
 
+  get tenantId(): string { return this.props.tenantId; }
   get id(): string { return this.props.id; }
   get name(): string { return this.props.name; }
   get taxId(): string { return this.props.taxId; }

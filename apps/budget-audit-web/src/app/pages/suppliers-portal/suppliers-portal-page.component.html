@@ -1,66 +1,108 @@
 <p-toast position="top-right"></p-toast>
-<p-confirmDialog [style]="{ width: '440px' }"></p-confirmDialog>
+<p-confirmDialog [style]="{ width: '460px' }"></p-confirmDialog>
 
 <div class="page">
-  <!-- Header con KPIs -->
+  <!-- ─────────── Header ─────────── -->
   <header class="page__header">
     <div class="page__title">
+      <div class="page__breadcrumb">
+        <i class="pi pi-briefcase"></i>
+        <span>Gestión de Maestros</span>
+        <i class="pi pi-angle-right"></i>
+        <span class="page__breadcrumb-current">Portal de Proveedores</span>
+      </div>
       <h1>Portal de Proveedores</h1>
       <p class="page__subtitle">
-        Catálogo maestro de proveedores: identidad, política de tolerancia
-        e inteligencia estratégica.
+        Catálogo maestro de proveedores con identidad fiscal, política de
+        tolerancia e inteligencia estratégica.
       </p>
     </div>
 
-    <button
-      pButton
-      type="button"
-      icon="pi pi-plus"
-      label="Nuevo Proveedor"
-      class="p-button-rounded p-button-primary page__cta"
-      (click)="openCreate()"
-    ></button>
+    <div class="page__actions">
+      <button
+        pButton
+        type="button"
+        icon="pi pi-refresh"
+        label="Actualizar"
+        class="p-button-outlined p-button-secondary p-button-sm"
+        (click)="fetchSuppliers()"
+        [loading]="loading()"
+      ></button>
+      <button
+        pButton
+        type="button"
+        icon="pi pi-plus"
+        label="Nuevo Proveedor"
+        class="p-button-sm"
+        (click)="openCreate()"
+      ></button>
+    </div>
   </header>
 
+  <!-- ─────────── KPIs ─────────── -->
   <section class="kpis">
     <article class="kpi">
-      <span class="kpi__label">Total</span>
-      <span class="kpi__value">{{ stats().total }}</span>
+      <div class="kpi__icon kpi__icon--primary">
+        <i class="pi pi-users"></i>
+      </div>
+      <div class="kpi__body">
+        <span class="kpi__label">Proveedores activos</span>
+        <span class="kpi__value">{{ stats().total }}</span>
+      </div>
     </article>
-    <article class="kpi kpi--accent">
-      <span class="kpi__label">Estratégicos</span>
-      <span class="kpi__value">{{ stats().strategic }}</span>
-    </article>
-    <article class="kpi kpi--danger">
-      <span class="kpi__label">Riesgo alto</span>
-      <span class="kpi__value">{{ stats().highRisk }}</span>
-    </article>
+
     <article class="kpi">
-      <span class="kpi__label">Tolerancia promedio</span>
-      <span class="kpi__value">{{ stats().avgTolerance }}%</span>
+      <div class="kpi__icon kpi__icon--accent">
+        <i class="pi pi-star"></i>
+      </div>
+      <div class="kpi__body">
+        <span class="kpi__label">Estratégicos</span>
+        <span class="kpi__value">{{ stats().strategic }}</span>
+      </div>
+    </article>
+
+    <article class="kpi">
+      <div class="kpi__icon kpi__icon--danger">
+        <i class="pi pi-exclamation-triangle"></i>
+      </div>
+      <div class="kpi__body">
+        <span class="kpi__label">Riesgo alto</span>
+        <span class="kpi__value">{{ stats().highRisk }}</span>
+      </div>
+    </article>
+
+    <article class="kpi">
+      <div class="kpi__icon kpi__icon--info">
+        <i class="pi pi-percentage"></i>
+      </div>
+      <div class="kpi__body">
+        <span class="kpi__label">Tolerancia promedio</span>
+        <span class="kpi__value">{{ stats().avgTolerance }}%</span>
+      </div>
     </article>
   </section>
 
-  <!-- Tabla -->
-  <section class="table-wrap">
+  <!-- ─────────── Tabla ─────────── -->
+  <section class="card">
     <p-table
       #dt
       [value]="rows()"
       [loading]="loading()"
       [paginator]="true"
       [rows]="10"
-      [rowsPerPageOptions]="[10, 25, 50]"
+      [rowsPerPageOptions]="[10, 25, 50, 100]"
       [globalFilterFields]="['name', 'taxId', 'contactEmail']"
       [scrollable]="true"
-      [responsiveLayout]="'stack'"
+      scrollHeight="flex"
       dataKey="id"
-      styleClass="p-datatable-sm p-datatable-striped"
-      currentPageReportTemplate="{first} - {last} de {totalRecords}"
+      styleClass="p-datatable-sm suppliers-table"
+      currentPageReportTemplate="Mostrando {first} - {last} de {totalRecords} proveedores"
       [showCurrentPageReport]="true"
+      [resizableColumns]="false"
     >
       <ng-template pTemplate="caption">
-        <div class="table-caption">
-          <span class="p-input-icon-left search">
+        <div class="table-toolbar">
+          <span class="table-toolbar__search p-input-icon-left">
             <i class="pi pi-search"></i>
             <input
               pInputText
@@ -70,62 +112,93 @@
             />
           </span>
 
-          <button
-            pButton
-            type="button"
-            icon="pi pi-refresh"
-            class="p-button-text p-button-sm"
-            pTooltip="Refrescar"
-            tooltipPosition="bottom"
-            (click)="fetchSuppliers()"
-          ></button>
+          <div class="table-toolbar__right">
+            <span class="table-toolbar__count">
+              <strong>{{ rows().length }}</strong>
+              {{ rows().length === 1 ? 'proveedor' : 'proveedores' }}
+            </span>
+          </div>
         </div>
       </ng-template>
 
       <ng-template pTemplate="header">
         <tr>
-          <th pSortableColumn="name" style="min-width: 220px">
-            Nombre <p-sortIcon field="name"></p-sortIcon>
+          <th pSortableColumn="name" style="min-width: 260px">
+            <div class="th">
+              Proveedor <p-sortIcon field="name"></p-sortIcon>
+            </div>
           </th>
-          <th pSortableColumn="taxId">
-            CUIT / Tax ID <p-sortIcon field="taxId"></p-sortIcon>
+          <th pSortableColumn="taxId" style="min-width: 140px">
+            <div class="th">
+              CUIT / Tax ID <p-sortIcon field="taxId"></p-sortIcon>
+            </div>
           </th>
-          <th pSortableColumn="contactEmail">
-            Email <p-sortIcon field="contactEmail"></p-sortIcon>
+          <th pSortableColumn="fidelityScore" style="min-width: 160px">
+            <div class="th">
+              Fidelidad <p-sortIcon field="fidelityScore"></p-sortIcon>
+            </div>
           </th>
-          <th pSortableColumn="fidelityScore">
-            Fidelidad <p-sortIcon field="fidelityScore"></p-sortIcon>
+          <th pSortableColumn="tolerancePercent" style="min-width: 130px">
+            <div class="th">
+              Tolerancia <p-sortIcon field="tolerancePercent"></p-sortIcon>
+            </div>
           </th>
-          <th pSortableColumn="tolerancePercent">
-            Tolerancia <p-sortIcon field="tolerancePercent"></p-sortIcon>
-          </th>
-          <th>Riesgo</th>
-          <th>Trend</th>
-          <th>Criticidad</th>
-          <th style="width: 110px; text-align: center">Acciones</th>
+          <th style="min-width: 120px">Riesgo</th>
+          <th style="min-width: 120px">Trend</th>
+          <th style="min-width: 130px">Criticidad</th>
+          <th style="width: 110px; text-align: right">Acciones</th>
         </tr>
       </ng-template>
 
       <ng-template pTemplate="body" let-row>
-        <tr>
+        <tr class="suppliers-table__row">
+          <!-- Proveedor: avatar + nombre + email -->
           <td>
             <div class="cell-supplier">
-              <span class="cell-supplier__name">{{ row.name }}</span>
-              <span class="cell-supplier__id">#{{ row.id.slice(0, 8) }}</span>
+              <div class="cell-supplier__avatar">
+                {{ row.name.slice(0, 2).toUpperCase() }}
+              </div>
+              <div class="cell-supplier__info">
+                <span class="cell-supplier__name">{{ row.name }}</span>
+                <a class="cell-supplier__email" [href]="'mailto:' + row.contactEmail">
+                  <i class="pi pi-envelope"></i>
+                  {{ row.contactEmail }}
+                </a>
+              </div>
             </div>
           </td>
-          <td>{{ row.taxId }}</td>
+
           <td>
-            <a class="link" [href]="'mailto:' + row.contactEmail">{{
-              row.contactEmail
-            }}</a>
+            <span class="cell-mono">{{ row.taxId }}</span>
           </td>
+
+          <!-- Fidelity score como progress bar -->
           <td>
-            <span class="score">{{ row.fidelityScore }}</span>
+            <div class="cell-score">
+              <div class="cell-score__bar">
+                <div
+                  class="cell-score__fill"
+                  [style.width.%]="row.fidelityScore"
+                  [class.cell-score__fill--low]="row.fidelityScore < 50"
+                  [class.cell-score__fill--mid]="
+                    row.fidelityScore >= 50 && row.fidelityScore < 80
+                  "
+                  [class.cell-score__fill--high]="row.fidelityScore >= 80"
+                ></div>
+              </div>
+              <span class="cell-score__num">{{ row.fidelityScore }}</span>
+            </div>
           </td>
+
           <td>
-            <span class="tolerance">{{ row.tolerancePercent }}%</span>
+            <p-tag
+              [value]="row.tolerancePercent + '%'"
+              severity="info"
+              [rounded]="true"
+              styleClass="tag-tolerance"
+            ></p-tag>
           </td>
+
           <td>
             <p-tag
               *ngIf="row.riskLevel; else dash"
@@ -134,33 +207,46 @@
               [rounded]="true"
             ></p-tag>
           </td>
+
           <td>
-            <p-tag
-              *ngIf="row.trend; else dash"
-              [value]="row.trend"
-              [severity]="trendSeverity(row.trend)"
-              [rounded]="true"
-            ></p-tag>
+            <span *ngIf="row.trend; else dash" class="cell-trend">
+              <i
+                class="pi"
+                [class.pi-arrow-up-right]="row.trend === 'IMPROVING'"
+                [class.pi-arrow-right]="row.trend === 'STABLE'"
+                [class.pi-arrow-down-right]="row.trend === 'DEGRADING'"
+                [class.cell-trend--up]="row.trend === 'IMPROVING'"
+                [class.cell-trend--flat]="row.trend === 'STABLE'"
+                [class.cell-trend--down]="row.trend === 'DEGRADING'"
+              ></i>
+              <span>{{ row.trend }}</span>
+            </span>
           </td>
-          <td>{{ criticalityLabel(row.criticality) }}</td>
+
+          <td>
+            <span class="cell-criticality" [attr.data-level]="row.criticality">
+              {{ criticalityLabel(row.criticality) }}
+            </span>
+          </td>
+
           <td>
             <div class="row-actions">
               <button
                 pButton
                 type="button"
                 icon="pi pi-pencil"
-                class="p-button-text p-button-sm"
+                class="p-button-rounded p-button-text p-button-sm"
                 pTooltip="Editar"
-                tooltipPosition="left"
+                tooltipPosition="top"
                 (click)="openEdit(row)"
               ></button>
               <button
                 pButton
                 type="button"
                 icon="pi pi-trash"
-                class="p-button-text p-button-sm p-button-danger"
+                class="p-button-rounded p-button-text p-button-sm p-button-danger"
                 pTooltip="Eliminar"
-                tooltipPosition="left"
+                tooltipPosition="top"
                 (click)="confirmDelete(row)"
               ></button>
             </div>
@@ -170,21 +256,26 @@
 
       <ng-template pTemplate="emptymessage">
         <tr>
-          <td colspan="9" class="empty">
+          <td colspan="8" class="empty">
             <div class="empty__inner">
-              <i class="pi pi-inbox empty__icon"></i>
-              <p class="empty__text">
+              <div class="empty__illustration">
+                <i class="pi pi-inbox"></i>
+              </div>
+              <h3 class="empty__title">
                 {{
                   loading()
                     ? 'Cargando proveedores…'
-                    : 'Aún no hay proveedores cargados.'
+                    : 'Sin proveedores cargados'
                 }}
+              </h3>
+              <p class="empty__text" *ngIf="!loading()">
+                Empezá creando el primer proveedor de tu catálogo maestro.
               </p>
               <button
                 *ngIf="!loading()"
                 pButton
                 type="button"
-                label="Crear el primero"
+                label="Crear proveedor"
                 icon="pi pi-plus"
                 (click)="openCreate()"
               ></button>
@@ -196,9 +287,11 @@
   </section>
 </div>
 
-<ng-template #dash>—</ng-template>
+<ng-template #dash>
+  <span class="dash">—</span>
+</ng-template>
 
-<!-- Dialog de Crear / Editar -->
+<!-- ─────────── Dialog Crear / Editar ─────────── -->
 <p-dialog
   [visible]="dialogVisible()"
   (visibleChange)="$event ? null : closeDialog()"
@@ -206,7 +299,7 @@
   [closable]="true"
   [draggable]="false"
   [resizable]="false"
-  [style]="{ width: '720px' }"
+  [style]="{ width: '760px' }"
   styleClass="supplier-dialog"
   [header]="editingId() ? 'Editar Proveedor' : 'Nuevo Proveedor'"
 >
@@ -214,11 +307,13 @@
     <div class="form__grid">
       <!-- Datos básicos -->
       <fieldset class="form__section">
-        <legend>Datos básicos</legend>
+        <legend>
+          <i class="pi pi-id-card"></i> Datos básicos
+        </legend>
 
         <div class="form__row">
           <label class="form__field form__field--full">
-            <span class="form__label">Razón social *</span>
+            <span class="form__label">Razón social <em>*</em></span>
             <input
               pInputText
               type="text"
@@ -236,7 +331,7 @@
 
         <div class="form__row">
           <label class="form__field">
-            <span class="form__label">CUIT / Tax ID *</span>
+            <span class="form__label">CUIT / Tax ID <em>*</em></span>
             <input
               pInputText
               type="text"
@@ -252,7 +347,7 @@
           </label>
 
           <label class="form__field">
-            <span class="form__label">Email de contacto *</span>
+            <span class="form__label">Email de contacto <em>*</em></span>
             <input
               pInputText
               type="email"
@@ -313,11 +408,13 @@
 
       <!-- Política de tolerancia -->
       <fieldset class="form__section">
-        <legend>Política de tolerancia</legend>
+        <legend>
+          <i class="pi pi-sliders-h"></i> Política de tolerancia
+        </legend>
 
         <div class="form__row">
           <label class="form__field">
-            <span class="form__label">Tolerancia % *</span>
+            <span class="form__label">Tolerancia % <em>*</em></span>
             <p-inputNumber
               formControlName="percentTolerance"
               [min]="0"
@@ -375,7 +472,7 @@
         pButton
         type="button"
         label="Cancelar"
-        class="p-button-text"
+        class="p-button-text p-button-secondary"
         (click)="closeDialog()"
         [disabled]="saving()"
       ></button>

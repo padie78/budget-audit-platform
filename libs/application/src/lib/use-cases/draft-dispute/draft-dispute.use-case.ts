@@ -9,6 +9,7 @@ import type { DisputeEmailDto } from '@budget-audit/common';
 import type { ILogger } from '../../ports/logger.port';
 
 export interface DraftDisputeCommand {
+  tenantId: string;
   supplierId: string;
   budgetId: string;
 }
@@ -33,16 +34,25 @@ export class DraftDisputeUseCase {
   constructor(private readonly deps: DraftDisputeDependencies) {}
 
   async execute(command: DraftDisputeCommand): Promise<DraftDisputeResult> {
-    const supplier = await this.deps.supplierRepository.findById(command.supplierId);
+    if (!command.tenantId?.trim()) {
+      throw new Error('tenantId es obligatorio en DraftDisputeCommand.');
+    }
+
+    const supplier = await this.deps.supplierRepository.findById(
+      command.tenantId,
+      command.supplierId,
+    );
     if (!supplier) throw new SupplierNotFoundError(command.supplierId);
 
     const budget = await this.deps.budgetRepository.findById(
+      command.tenantId,
       command.supplierId,
       command.budgetId,
     );
     if (!budget) throw new ContractNotFoundError(command.supplierId);
 
     this.deps.logger.info('Drafting dispute email', {
+      tenantId: command.tenantId,
       supplierId: command.supplierId,
       budgetId: command.budgetId,
     });

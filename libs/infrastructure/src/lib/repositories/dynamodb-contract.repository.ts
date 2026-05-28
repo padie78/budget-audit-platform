@@ -36,6 +36,7 @@ interface ContractItem {
   PK: string;
   SK: string;
   entityType: typeof EntityType.Contract;
+  tenantId: string;
   id: string;
   supplierId: string;
   effectiveFrom: string;
@@ -72,13 +73,14 @@ export class DynamoDbContractRepository implements IContractRepository {
   }
 
   async findById(
+    tenantId: string,
     supplierId: string,
     contractId: string,
   ): Promise<Contract | null> {
     const res = await this.client.send(
       new GetCommand({
         TableName: this.tableName,
-        Key: DynamoKeys.contract(supplierId, contractId),
+        Key: DynamoKeys.contract(tenantId, supplierId, contractId),
       }),
     );
     if (!res.Item) return null;
@@ -86,6 +88,7 @@ export class DynamoDbContractRepository implements IContractRepository {
   }
 
   async findActiveBySupplier(
+    tenantId: string,
     supplierId: string,
     at: Date = new Date(),
   ): Promise<Contract | null> {
@@ -94,7 +97,7 @@ export class DynamoDbContractRepository implements IContractRepository {
         TableName: this.tableName,
         KeyConditionExpression: 'PK = :pk AND begins_with(SK, :sk)',
         ExpressionAttributeValues: {
-          ':pk': DynamoKeys.supplier(supplierId).PK,
+          ':pk': DynamoKeys.supplierPK(tenantId, supplierId),
           ':sk': KeyPrefix.Contract,
         },
         ScanIndexForward: false,
@@ -202,6 +205,7 @@ export class DynamoDbContractRepository implements IContractRepository {
       : undefined;
 
     return Contract.create({
+      tenantId: item.tenantId,
       id: item.id,
       supplierId: item.supplierId,
       effectiveFrom: new Date(item.effectiveFrom),

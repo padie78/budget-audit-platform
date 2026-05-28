@@ -56,11 +56,25 @@
         } @else {
           <!-- ───── ITEM HIJO ───── -->
           <a
-            class="group flex items-center gap-3 pl-3 pr-2.5 py-1.5 rounded-md cursor-pointer text-[13px] text-slate-400 hover:bg-slate-800/70 hover:text-white transition-colors duration-150"
+            [routerLink]="item.routerLink"
+            routerLinkActive
+            #rla="routerLinkActive"
+            class="group flex items-center gap-3 pl-3 pr-2.5 py-1.5 rounded-md cursor-pointer text-[13px] transition-colors duration-150"
+            [ngClass]="
+              rla.isActive
+                ? 'bg-indigo-500/15 ring-1 ring-indigo-500/30 text-white'
+                : 'text-slate-400 hover:bg-slate-800/70 hover:text-white'
+            "
           >
             <i
               *ngIf="item.icon"
-              [class]="item.icon + ' text-[13px] text-slate-500 group-hover:text-indigo-300'"
+              [class]="
+                item.icon +
+                ' text-[13px] ' +
+                (rla.isActive
+                  ? 'text-indigo-300'
+                  : 'text-slate-500 group-hover:text-indigo-300')
+              "
             ></i>
 
             <span class="flex-1 truncate font-medium">{{ item.label }}</span>

@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { inject, Injectable } from '@angular/core';
 import { generateClient } from 'aws-amplify/api';
 import { from, map, Observable } from 'rxjs';
 import type {
@@ -7,14 +7,18 @@ import type {
   SupplierDto,
   UpdateSupplierInputDto,
 } from '@budget-audit/common';
+import { TenantContextService } from '../core/tenant/tenant.context';
 
 /* =============================================================================
  * SupplierService — único punto de contacto del Portal de Proveedores con
  * AppSync. Encapsula queries/mutations GraphQL y normaliza el shape de
  * `smartThresholds.categories` (lista de entries en GraphQL ↔ Record local).
+ *
+ * Multitenant: cada request incluye `tenantId` resuelto desde
+ * `TenantContextService`. Cuando se incorpore Cognito, el tenant podrá viajar
+ * en el JWT y los args explícitos se reemplazarán por claims.
  * ============================================================================= */
 
-/** Shape de `smartThresholds.categories` tal como la transmite AppSync. */
 interface SmartThresholdCategoryEntry {
   category: string;
   tolerancePercentage: number;
@@ -45,108 +49,68 @@ interface GetSupplierResponse {
 
 /* ────────────────── Operaciones GraphQL ────────────────── */
 
+const SUPPLIER_FIELDS = /* GraphQL */ `
+  tenantId
+  id
+  name
+  taxId
+  contactEmail
+  fidelityScore
+  thresholdPolicy {
+    percentTolerance
+    absoluteTolerance
+    autoApprovalUpTo
+    currency
+  }
+  contactInfo {
+    email
+    phone
+    address
+  }
+  vendorPerformance {
+    reliabilityScore
+    totalAuditedDocs
+    totalDisputesRaised
+    averageDisputeResolutionDays
+    slaDeliveryComplianceRate
+    trend
+  }
+  strategicIntelligence {
+    riskProfile {
+      score
+      level
+      lastCheck
+    }
+    paymentStrategy {
+      earlyPaymentPreferred
+      discountTargetPercentage
+    }
+    diversityStatus
+    criticalityIndex
+  }
+  smartThresholds {
+    defaultTolerancePercentage
+    categories {
+      category
+      tolerancePercentage
+    }
+  }
+  createdAt
+  updatedAt
+`;
+
 const LIST_SUPPLIERS = /* GraphQL */ `
-  query ListSuppliers($limit: Int) {
-    listSuppliers(limit: $limit) {
-      id
-      name
-      taxId
-      contactEmail
-      fidelityScore
-      thresholdPolicy {
-        percentTolerance
-        absoluteTolerance
-        autoApprovalUpTo
-        currency
-      }
-      contactInfo {
-        email
-        phone
-        address
-      }
-      vendorPerformance {
-        reliabilityScore
-        totalAuditedDocs
-        totalDisputesRaised
-        averageDisputeResolutionDays
-        slaDeliveryComplianceRate
-        trend
-      }
-      strategicIntelligence {
-        riskProfile {
-          score
-          level
-          lastCheck
-        }
-        paymentStrategy {
-          earlyPaymentPreferred
-          discountTargetPercentage
-        }
-        diversityStatus
-        criticalityIndex
-      }
-      smartThresholds {
-        defaultTolerancePercentage
-        categories {
-          category
-          tolerancePercentage
-        }
-      }
-      createdAt
-      updatedAt
+  query ListSuppliers($tenantId: ID!, $limit: Int) {
+    listSuppliers(tenantId: $tenantId, limit: $limit) {
+      ${SUPPLIER_FIELDS}
     }
   }
 `;
 
 const GET_SUPPLIER = /* GraphQL */ `
-  query GetSupplier($supplierId: ID!) {
-    getSupplier(supplierId: $supplierId) {
-      id
-      name
-      taxId
-      contactEmail
-      fidelityScore
-      thresholdPolicy {
-        percentTolerance
-        absoluteTolerance
-        autoApprovalUpTo
-        currency
-      }
-      contactInfo {
-        email
-        phone
-        address
-      }
-      vendorPerformance {
-        reliabilityScore
-        totalAuditedDocs
-        totalDisputesRaised
-        averageDisputeResolutionDays
-        slaDeliveryComplianceRate
-        trend
-      }
-      strategicIntelligence {
-        riskProfile {
-          score
-          level
-          lastCheck
-        }
-        paymentStrategy {
-          earlyPaymentPreferred
-          discountTargetPercentage
-        }
-        diversityStatus
-        criticalityIndex
-      }
-      smartThresholds {
-        defaultTolerancePercentage
-        categories {
-          category
-          tolerancePercentage
-        }
-      }
-      createdAt
-      updatedAt
+  query GetSupplier($tenantId: ID!, $supplierId: ID!) {
+    getSupplier(tenantId: $tenantId, supplierId: $supplierId) {
+      ${SUPPLIER_FIELDS}
     }
   }
 `;
@@ -154,24 +118,7 @@ const GET_SUPPLIER = /* GraphQL */ `
 const CREATE_SUPPLIER = /* GraphQL */ `
   mutation CreateSupplier($input: CreateSupplierInput!) {
     createSupplier(input: $input) {
-      id
-      name
-      taxId
-      contactEmail
-      fidelityScore
-      thresholdPolicy {
-        percentTolerance
-        absoluteTolerance
-        autoApprovalUpTo
-        currency
-      }
-      contactInfo {
-        email
-        phone
-        address
-      }
-      createdAt
-      updatedAt
+      ${SUPPLIER_FIELDS}
     }
   }
 `;
@@ -179,31 +126,15 @@ const CREATE_SUPPLIER = /* GraphQL */ `
 const UPDATE_SUPPLIER = /* GraphQL */ `
   mutation UpdateSupplier($input: UpdateSupplierInput!) {
     updateSupplier(input: $input) {
-      id
-      name
-      taxId
-      contactEmail
-      fidelityScore
-      thresholdPolicy {
-        percentTolerance
-        absoluteTolerance
-        autoApprovalUpTo
-        currency
-      }
-      contactInfo {
-        email
-        phone
-        address
-      }
-      createdAt
-      updatedAt
+      ${SUPPLIER_FIELDS}
     }
   }
 `;
 
 const DELETE_SUPPLIER = /* GraphQL */ `
-  mutation DeleteSupplier($id: ID!) {
-    deleteSupplier(id: $id) {
+  mutation DeleteSupplier($tenantId: ID!, $id: ID!) {
+    deleteSupplier(tenantId: $tenantId, id: $id) {
+      tenantId
       id
       deleted
     }
@@ -230,7 +161,14 @@ function normalizeSupplier(s: SupplierGraphQL): SupplierDto {
 }
 
 /** Convierte el input del UI (Record) al shape esperado por AppSync (lista). */
-function denormalizeInput<T extends { smartThresholds?: { defaultTolerancePercentage: number; categories: Record<string, number> } }>(
+function denormalizeInput<
+  T extends {
+    smartThresholds?: {
+      defaultTolerancePercentage: number;
+      categories: Record<string, number>;
+    };
+  },
+>(
   input: T,
 ): Omit<T, 'smartThresholds'> & {
   smartThresholds?: {
@@ -260,23 +198,24 @@ function denormalizeInput<T extends { smartThresholds?: { defaultTolerancePercen
 @Injectable({ providedIn: 'root' })
 export class SupplierService {
   private readonly client = generateClient();
+  private readonly tenantCtx = inject(TenantContextService);
 
   listSuppliers(limit = 100): Observable<SupplierDto[]> {
+    const tenantId = this.tenantCtx.current();
     return from(
       this.client.graphql<ListSuppliersResponse>({
         query: LIST_SUPPLIERS,
-        variables: { limit },
+        variables: { tenantId, limit },
       }),
-    ).pipe(
-      map((res) => res.data.listSuppliers.map(normalizeSupplier)),
-    );
+    ).pipe(map((res) => res.data.listSuppliers.map(normalizeSupplier)));
   }
 
   getSupplier(supplierId: string): Observable<SupplierDto | null> {
+    const tenantId = this.tenantCtx.current();
     return from(
       this.client.graphql<GetSupplierResponse>({
         query: GET_SUPPLIER,
-        variables: { supplierId },
+        variables: { tenantId, supplierId },
       }),
     ).pipe(
       map((res) =>
@@ -285,29 +224,36 @@ export class SupplierService {
     );
   }
 
-  createSupplier(input: CreateSupplierInputDto): Observable<SupplierDto> {
+  createSupplier(
+    input: Omit<CreateSupplierInputDto, 'tenantId'>,
+  ): Observable<SupplierDto> {
+    const tenantId = this.tenantCtx.current();
     return from(
       this.client.graphql<CreateSupplierResponse>({
         query: CREATE_SUPPLIER,
-        variables: { input: denormalizeInput(input) },
+        variables: { input: denormalizeInput({ ...input, tenantId }) },
       }),
     ).pipe(map((res) => normalizeSupplier(res.data.createSupplier)));
   }
 
-  updateSupplier(input: UpdateSupplierInputDto): Observable<SupplierDto> {
+  updateSupplier(
+    input: Omit<UpdateSupplierInputDto, 'tenantId'>,
+  ): Observable<SupplierDto> {
+    const tenantId = this.tenantCtx.current();
     return from(
       this.client.graphql<UpdateSupplierResponse>({
         query: UPDATE_SUPPLIER,
-        variables: { input: denormalizeInput(input) },
+        variables: { input: denormalizeInput({ ...input, tenantId }) },
       }),
     ).pipe(map((res) => normalizeSupplier(res.data.updateSupplier)));
   }
 
   deleteSupplier(id: string): Observable<DeleteSupplierResultDto> {
+    const tenantId = this.tenantCtx.current();
     return from(
       this.client.graphql<DeleteSupplierResponse>({
         query: DELETE_SUPPLIER,
-        variables: { id },
+        variables: { tenantId, id },
       }),
     ).pipe(map((res) => res.data.deleteSupplier));
   }

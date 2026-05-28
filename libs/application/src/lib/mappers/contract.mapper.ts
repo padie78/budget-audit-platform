@@ -28,6 +28,7 @@ export class ContractMapper {
     }
 
     return {
+      tenantId: snap.tenantId,
       id: snap.id,
       supplierId: snap.supplierId,
       effectiveFrom: snap.effectiveFrom.toISOString(),

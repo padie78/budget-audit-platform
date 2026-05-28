@@ -34,6 +34,9 @@ import type {
   CreateSupplierInputDto,
   UpdateSupplierInputDto,
 } from '@budget-audit/common';
+
+type CreateSupplierViewInput = Omit<CreateSupplierInputDto, 'tenantId'>;
+type UpdateSupplierViewInput = Omit<UpdateSupplierInputDto, 'tenantId'>;
 import { SupplierService } from '../../services/supplier.service';
 import {
   toSupplierRowVm,
@@ -287,8 +290,10 @@ export class SuppliersPortalPageComponent {
       ? this.suppliers.updateSupplier({
           ...commonInput,
           id: editingId,
-        } satisfies UpdateSupplierInputDto)
-      : this.suppliers.createSupplier(commonInput satisfies CreateSupplierInputDto);
+        } satisfies UpdateSupplierViewInput)
+      : this.suppliers.createSupplier(
+          commonInput satisfies CreateSupplierViewInput,
+        );
 
     op$
       .pipe(takeUntilDestroyed(this.destroyRef))
