@@ -1,0 +1,25 @@
+node_modules/
+dist/
+tmp/
+.nx/
+coverage/
+*.log
+.env
+.env.*
+!.env.example
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfvars
+!*.tfvars.example
+.terraform.lock.hcl
+
+# IDE
+.vscode/
+.idea/
+.DS_Store
+
+# Angular
+.angular/

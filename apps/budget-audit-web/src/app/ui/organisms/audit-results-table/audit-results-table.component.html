@@ -1,0 +1,57 @@
+<section class="results-table">
+  <header class="results-table__header">
+    <div>
+      <h3>Detalle por ítem</h3>
+      <p class="results-table__counts">
+        <strong>{{ counts().total }}</strong> ítems ·
+        <span class="dot dot--red"></span>{{ counts().red }} críticos ·
+        <span class="dot dot--yellow"></span>{{ counts().yellow }} a revisar ·
+        <span class="dot dot--green"></span>{{ counts().green }} ok
+      </p>
+    </div>
+  </header>
+
+  @if (visibleRows().length === 0) {
+    <div class="results-table__empty">{{ emptyMessage() }}</div>
+  } @else {
+    <div class="results-table__scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>SKU</th>
+            <th>Descripción</th>
+            <th class="num">Precio pactado</th>
+            <th class="num">Precio cotizado</th>
+            <th class="num">Desvío</th>
+            <th>Alerta</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of visibleRows(); track trackBySku($index, row)) {
+            <tr [attr.data-severity]="row.severity">
+              <td class="mono">{{ row.sku }}</td>
+              <td>{{ row.description }}</td>
+              <td class="num">
+                @if (row.agreedUnitPrice !== null) {
+                  {{ row.agreedUnitPrice | currency:currency():'symbol':'1.2-2' }}
+                } @else {
+                  <span class="muted">N/D</span>
+                }
+              </td>
+              <td class="num">
+                {{ row.quotedUnitPrice | currency:currency():'symbol':'1.2-2' }}
+              </td>
+              <td class="num" [class.deviation--positive]="row.deviationPercent > 0">
+                {{ formatPercent(row.deviationPercent) }}
+              </td>
+              <td>
+                <app-severity-badge [severity]="row.severity"></app-severity-badge>
+                <small>{{ row.message }}</small>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</section>

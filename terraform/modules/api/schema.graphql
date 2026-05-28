@@ -1,0 +1,131 @@
+scalar AWSDateTime
+scalar AWSJSON
+
+enum AuditStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum AlertSeverity {
+  GREEN
+  YELLOW
+  RED
+}
+
+type Supplier {
+  id: ID!
+  name: String!
+  taxId: String!
+  contactEmail: String!
+  createdAt: AWSDateTime!
+  updatedAt: AWSDateTime!
+}
+
+type ExtractedBudgetItem {
+  sku: String!
+  description: String!
+  unit: String!
+  quantity: Float!
+  unitPrice: Float!
+  lineTotal: Float!
+}
+
+type ExtractedBudget {
+  supplierName: String!
+  quoteNumber: String
+  currency: String!
+  issuedAt: AWSDateTime
+  items: [ExtractedBudgetItem!]!
+  totalAmount: Float!
+}
+
+type BudgetAlert {
+  sku: String!
+  description: String!
+  agreedUnitPrice: Float
+  quotedUnitPrice: Float!
+  deviationPercent: Float!
+  severity: AlertSeverity!
+  message: String!
+}
+
+type Budget {
+  id: ID!
+  supplierId: ID!
+  contractId: ID
+  s3Url: String!
+  status: AuditStatus!
+  extractedBudget: ExtractedBudget
+  alerts: [BudgetAlert!]!
+  totalDeviationAmount: Float!
+  totalDeviationPercent: Float!
+  errorMessage: String
+  createdAt: AWSDateTime!
+  updatedAt: AWSDateTime!
+}
+
+type SignedUploadUrl {
+  uploadUrl: String!
+  s3Url: String!
+  key: String!
+  expiresIn: Int!
+}
+
+input AuditBudgetInput {
+  supplierId: ID!
+  s3Url: String!
+  contractId: ID
+}
+
+input SignUploadInput {
+  supplierId: ID!
+  fileName: String!
+  contentType: String!
+}
+
+input BudgetInput {
+  budgetId: ID!
+  supplierId: ID!
+  budget: AWSJSON!
+}
+
+input AuditCompletedEventInput {
+  budgetId: ID!
+  supplierId: ID!
+  budget: AWSJSON!
+}
+
+type AuditCompletedAck {
+  budgetId: ID!
+}
+
+type Query {
+  getBudget(supplierId: ID!, budgetId: ID!): Budget
+  listBudgetsBySupplier(supplierId: ID!, limit: Int): [Budget!]!
+  getSupplier(supplierId: ID!): Supplier
+}
+
+type Mutation {
+  # Mutation principal: dispara la auditoría completa de un PDF.
+  auditBudget(input: AuditBudgetInput!): Budget!
+
+  # Genera una URL pre-firmada para subir el PDF a S3.
+  signUpload(input: SignUploadInput!): SignedUploadUrl!
+
+  # Mutations internas usadas por la propia Lambda para emitir eventos
+  # que despiertan a las subscriptions. NO usar desde el frontend.
+  publishAuditCompleted(event: AuditCompletedEventInput!): AuditCompletedAck!
+  publishAuditFailed(budget: BudgetInput!): AuditCompletedAck!
+}
+
+type Subscription {
+  # El frontend se suscribe filtrando por supplierId para recibir el
+  # reporte final en cuanto la Lambda termine de procesar.
+  onAuditCompleted(supplierId: ID!): Budget
+    @aws_subscribe(mutations: ["publishAuditCompleted"])
+
+  onAuditFailed(supplierId: ID!): Budget
+    @aws_subscribe(mutations: ["publishAuditFailed"])
+}

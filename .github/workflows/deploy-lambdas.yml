@@ -1,0 +1,129 @@
+name: Deploy Lambdas
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "lambda_code/**"
+      - "libs/common/**"
+      - "libs/domain/**"
+      - "libs/application/**"
+      - "libs/infrastructure/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/deploy-lambdas.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: lambdas-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+
+jobs:
+  build:
+    name: Build (${{ matrix.lambda }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - lambda: budget_processor_lambda
+            tf_output: budget_processor_lambda_name
+          - lambda: appsync_api_lambda
+            tf_output: appsync_api_lambda_name
+          - lambda: signer_lambda
+            tf_output: signer_lambda_name
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup monorepo
+        uses: ./.github/actions/setup-node-monorepo
+
+      - name: Build libs (tsc)
+        run: npx nx run-many --target=build --projects=common,domain,application,infrastructure --parallel=4
+
+      - name: Bundle lambda with esbuild
+        working-directory: lambda_code/${{ matrix.lambda }}
+        run: npm run build
+
+      - name: Zip artifact
+        working-directory: lambda_code/${{ matrix.lambda }}
+        run: |
+          cd dist
+          zip -qr ../${{ matrix.lambda }}.zip .
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.lambda }}-zip
+          path: lambda_code/${{ matrix.lambda }}/${{ matrix.lambda }}.zip
+          retention-days: 7
+          if-no-files-found: error
+
+  deploy:
+    name: Deploy (${{ matrix.lambda }})
+    needs: build
+    runs-on: ubuntu-latest
+    environment: production
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        include:
+          - lambda: budget_processor_lambda
+            tf_output: budget_processor_lambda_name
+          - lambda: appsync_api_lambda
+            tf_output: appsync_api_lambda_name
+          - lambda: signer_lambda
+            tf_output: signer_lambda_name
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.5
+          terraform_wrapper: false
+
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ matrix.lambda }}-zip
+          path: artifact
+
+      - name: Resolve function name from Terraform output
+        id: tf
+        working-directory: terraform
+        run: |
+          terraform init -backend=true -input=false -no-color
+          FN_NAME=$(terraform output -raw ${{ matrix.tf_output }})
+          echo "function_name=$FN_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Update Lambda code
+        run: |
+          aws lambda update-function-code \
+            --function-name "${{ steps.tf.outputs.function_name }}" \
+            --zip-file "fileb://artifact/${{ matrix.lambda }}.zip" \
+            --publish \
+            --no-cli-pager
+
+      - name: Wait until Lambda is Active
+        run: |
+          aws lambda wait function-updated \
+            --function-name "${{ steps.tf.outputs.function_name }}"

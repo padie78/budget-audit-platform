@@ -1,0 +1,102 @@
+name: Deploy Frontend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/budget-audit-web/**"
+      - "libs/common/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/deploy-frontend.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: frontend-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  BUILD_PATH: dist/apps/budget-audit-web
+
+jobs:
+  build-and-deploy:
+    name: Build & Sync to S3
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup monorepo
+        uses: ./.github/actions/setup-node-monorepo
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.5
+          terraform_wrapper: false
+
+      - name: Resolve infra outputs
+        id: tf
+        working-directory: terraform
+        run: |
+          terraform init -backend=true -input=false -no-color
+          BUCKET=$(terraform output -raw frontend_bucket)
+          DIST_ID=$(terraform output -raw frontend_cloudfront_id)
+          APPSYNC_ENDPOINT=$(terraform output -raw appsync_endpoint)
+          APPSYNC_API_KEY=$(terraform output -raw appsync_api_key)
+          {
+            echo "bucket=$BUCKET"
+            echo "distribution_id=$DIST_ID"
+            echo "appsync_endpoint=$APPSYNC_ENDPOINT"
+          } >> "$GITHUB_OUTPUT"
+          echo "::add-mask::$APPSYNC_API_KEY"
+          echo "appsync_api_key=$APPSYNC_API_KEY" >> "$GITHUB_OUTPUT"
+
+      - name: Inject runtime environment
+        run: |
+          cat > apps/budget-audit-web/src/environments/environment.prod.ts <<EOF
+          export const environment = {
+            production: true,
+            appsync: {
+              endpoint: '${{ steps.tf.outputs.appsync_endpoint }}',
+              region: '${{ env.AWS_REGION }}',
+              apiKey: '${{ steps.tf.outputs.appsync_api_key }}',
+            },
+          };
+          EOF
+
+      - name: Build Angular (production)
+        run: npx nx build budget-audit-web --configuration=production
+
+      - name: Sync immutable assets to S3
+        run: |
+          aws s3 sync "${{ env.BUILD_PATH }}/" "s3://${{ steps.tf.outputs.bucket }}/" \
+            --delete \
+            --exclude "index.html" \
+            --cache-control "public, max-age=31536000, immutable"
+
+      - name: Sync index.html (no-cache)
+        run: |
+          aws s3 cp "${{ env.BUILD_PATH }}/index.html" "s3://${{ steps.tf.outputs.bucket }}/index.html" \
+            --cache-control "no-cache, no-store, must-revalidate" \
+            --content-type "text/html; charset=utf-8"
+
+      - name: Invalidate CloudFront
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id "${{ steps.tf.outputs.distribution_id }}" \
+            --paths "/index.html" "/" \
+            --no-cli-pager

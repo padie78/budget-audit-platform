@@ -1,0 +1,109 @@
+<section class="workspace">
+  <!-- ─────── Panel izquierdo: input & estado ─────── -->
+  <aside class="workspace__left">
+    <header class="workspace__intro">
+      <h2>Nueva auditoría</h2>
+      <p>Sube el PDF del presupuesto y la IA detectará desvíos vs. contrato base.</p>
+    </header>
+
+    <form class="workspace__form" (ngSubmit)="startAudit()">
+      <label class="field">
+        <span>ID de proveedor</span>
+        <input
+          type="text"
+          [ngModel]="supplierId()"
+          (ngModelChange)="supplierId.set($event)"
+          name="supplierId"
+          placeholder="ej. ACME-001"
+          [disabled]="isBusy()"
+          required
+          autocomplete="off"
+        />
+      </label>
+
+      <app-file-dropzone
+        [disabled]="isBusy()"
+        (fileSelected)="onFileSelected($event)"
+        (fileRejected)="onFileRejected($event)"
+      ></app-file-dropzone>
+
+      <button type="submit" class="btn-primary" [disabled]="!canSubmit()">
+        @if (isBusy()) {
+          <span class="spinner" aria-hidden="true"></span>
+        }
+        @switch (state()) {
+          @case ('uploading') { Subiendo PDF... }
+          @case ('processing') { Auditando con IA... }
+          @default { Iniciar auditoría }
+        }
+      </button>
+
+      @if (errorMessage()) {
+        <p class="error" role="alert">{{ errorMessage() }}</p>
+      }
+    </form>
+
+    <ul class="workspace__steps" aria-label="Progreso">
+      <li [class.active]="state() === 'uploading'"
+          [class.done]="state() === 'processing' || state() === 'completed'">
+        Subida del archivo
+      </li>
+      <li [class.active]="state() === 'processing'"
+          [class.done]="state() === 'completed'">
+        Extracción IA
+      </li>
+      <li [class.active]="state() === 'completed'">
+        Auditoría completada
+      </li>
+    </ul>
+  </aside>
+
+  <!-- ─────── Panel derecho: resultados ─────── -->
+  <main class="workspace__right">
+    @if (state() === 'idle') {
+      <div class="placeholder">
+        <h3>Esperando archivo</h3>
+        <p>El reporte aparecerá aquí en cuanto la IA finalice la auditoría.</p>
+      </div>
+    } @else if (isBusy() && !budget()) {
+      <div class="placeholder placeholder--loading">
+        <div class="spinner spinner--lg"></div>
+        <h3>Procesando presupuesto...</h3>
+        <p>Extrayendo ítems y comparando contra el contrato base.</p>
+      </div>
+    } @else if (summary(); as s) {
+      <header class="report-header">
+        <div class="report-header__meta">
+          <h2>Reporte de auditoría</h2>
+          <p>
+            Proveedor: <strong>{{ s.supplierName }}</strong>
+            · Moneda: {{ s.currency }}
+          </p>
+        </div>
+
+        <div class="kpis">
+          <div class="kpi">
+            <span class="kpi__label">Total cotizado</span>
+            <span class="kpi__value">{{ s.totalAmount | currency:s.currency:'symbol':'1.2-2' }}</span>
+          </div>
+          <div class="kpi kpi--danger">
+            <span class="kpi__label">Sobreprecio total</span>
+            <span class="kpi__value">
+              {{ s.totalDeviationAmount | currency:s.currency:'symbol':'1.2-2' }}
+            </span>
+            <small>{{ s.totalDeviationPercent | number:'1.2-2' }}%</small>
+          </div>
+          <div class="kpi kpi--red">
+            <span class="kpi__label">Alertas críticas</span>
+            <span class="kpi__value">{{ s.redAlertsCount }}</span>
+          </div>
+        </div>
+      </header>
+
+      <app-audit-results-table
+        [rows]="rows()"
+        [currency]="s.currency"
+      ></app-audit-results-table>
+    }
+  </main>
+</section>

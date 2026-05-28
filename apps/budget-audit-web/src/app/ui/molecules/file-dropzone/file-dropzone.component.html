@@ -1,0 +1,43 @@
+<div
+  class="dropzone"
+  [class.dropzone--dragging]="isDragging()"
+  [class.dropzone--disabled]="disabled()"
+  [class.dropzone--filled]="!!selectedFile()"
+  (click)="openPicker()"
+  role="button"
+  tabindex="0"
+  (keydown.enter)="openPicker()"
+  (keydown.space)="openPicker()"
+>
+  <input
+    #fileInput
+    type="file"
+    [accept]="accept()"
+    [disabled]="disabled()"
+    (change)="onFileInputChange($event)"
+    hidden
+  />
+
+  @if (selectedFile(); as file) {
+    <div class="dropzone__file">
+      <span class="dropzone__icon" aria-hidden="true">PDF</span>
+      <div class="dropzone__meta">
+        <span class="dropzone__name">{{ fileName() }}</span>
+        <small class="dropzone__size">{{ fileSize() }}</small>
+      </div>
+      <button
+        type="button"
+        class="dropzone__clear"
+        (click)="clear($event)"
+        [disabled]="disabled()"
+        aria-label="Quitar archivo"
+      >×</button>
+    </div>
+  } @else {
+    <div class="dropzone__empty">
+      <strong>Arrastra el PDF aquí</strong>
+      <span>o haz clic para buscarlo</span>
+      <small>{{ hint() }}</small>
+    </div>
+  }
+</div>

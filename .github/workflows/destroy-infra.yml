@@ -1,0 +1,98 @@
+name: Destroy Infrastructure (MANUAL)
+
+# Pipeline DESTRUCTIVO. Solo se dispara manualmente y exige que el operador
+# escriba literalmente "DESTROY" como confirmación. Adicionalmente, requiere
+# que el environment `production` apruebe la ejecución (gate humano).
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Escribe exactamente "DESTROY" para confirmar.'
+        required: true
+        type: string
+      empty_buckets:
+        description: 'Vaciar los buckets S3 antes del destroy.'
+        required: true
+        default: true
+        type: boolean
+
+concurrency:
+  group: terraform-destroy
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  TF_IN_AUTOMATION: "true"
+  TF_INPUT: "false"
+
+jobs:
+  guard:
+    name: Confirmation guard
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify confirmation token
+        run: |
+          if [ "${{ inputs.confirmation }}" != "DESTROY" ]; then
+            echo "::error::Confirmación inválida. Debes escribir exactamente DESTROY."
+            exit 1
+          fi
+
+  destroy:
+    name: Terraform Destroy
+    needs: guard
+    runs-on: ubuntu-latest
+    environment: production
+    defaults:
+      run:
+        working-directory: terraform
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.5
+          terraform_wrapper: false
+
+      - name: Terraform init
+        run: terraform init -upgrade
+
+      - name: Empty S3 buckets
+        if: ${{ inputs.empty_buckets }}
+        run: |
+          set -euo pipefail
+          for output in budgets_bucket frontend_bucket; do
+            BUCKET=$(terraform output -raw "$output" 2>/dev/null || true)
+            if [ -n "$BUCKET" ]; then
+              echo "Vaciando s3://$BUCKET (incluye versiones y delete markers)..."
+              aws s3api list-object-versions --bucket "$BUCKET" \
+                --query '{Objects: Versions[].{Key:Key, VersionId:VersionId}}' \
+                --output json > versions.json || echo '{"Objects":[]}' > versions.json
+              if [ "$(jq '.Objects | length' versions.json)" -gt 0 ]; then
+                aws s3api delete-objects --bucket "$BUCKET" --delete file://versions.json --no-cli-pager
+              fi
+              aws s3api list-object-versions --bucket "$BUCKET" \
+                --query '{Objects: DeleteMarkers[].{Key:Key, VersionId:VersionId}}' \
+                --output json > markers.json || echo '{"Objects":[]}' > markers.json
+              if [ "$(jq '.Objects | length' markers.json)" -gt 0 ]; then
+                aws s3api delete-objects --bucket "$BUCKET" --delete file://markers.json --no-cli-pager
+              fi
+            fi
+          done
+
+      - name: Terraform destroy
+        run: |
+          terraform destroy -auto-approve \
+            -var "openai_api_key=${{ secrets.OPENAI_API_KEY }}"
