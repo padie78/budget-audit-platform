@@ -54,3 +54,12 @@ export * from './lib/ports/supplier-repository.port';
 export * from './lib/ports/ai-extractor-service.port';
 export * from './lib/ports/audit-event-publisher.port';
 export * from './lib/ports/dispute-writer-service.port';
+
+// Ports — Supplier Intelligence
+export * from './lib/ports/audit-history.port';
+export * from './lib/ports/dispute-history.port';
+export * from './lib/ports/ai-document-extractor.port';
+export * from './lib/ports/cfo-context.port';
+
+// Domain services — Supplier Intelligence
+export * from './lib/services/supplier-intelligence';

@@ -11,3 +11,6 @@ export * from './lib/use-cases/suppliers/create-supplier.use-case';
 export * from './lib/use-cases/suppliers/update-supplier.use-case';
 export * from './lib/use-cases/suppliers/delete-supplier.use-case';
 export * from './lib/use-cases/suppliers/list-suppliers.use-case';
+
+// Supplier Intelligence — recálculos sugeridos/calculados por IA y heurísticas.
+export * from './lib/use-cases/supplier-intelligence';
