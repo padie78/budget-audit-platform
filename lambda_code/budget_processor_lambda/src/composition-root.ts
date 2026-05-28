@@ -1,4 +1,7 @@
-import { AuditBudgetUseCase } from '@budget-audit/application';
+import {
+  AuditBudgetUseCase,
+  DraftDisputeUseCase,
+} from '@budget-audit/application';
 import {
   AppSyncEventPublisherAdapter,
   ConsoleLogger,
@@ -6,6 +9,7 @@ import {
   DynamoDbContractRepository,
   DynamoDbSupplierRepository,
   OpenAiBudgetExtractorAdapter,
+  OpenAiDisputeWriterAdapter,
   UuidIdGenerator,
 } from '@budget-audit/infrastructure';
 
@@ -14,14 +18,14 @@ import {
  * concretos. La función se ejecuta una sola vez por contenedor Lambda
  * (cold start), por lo que las dependencias se reutilizan entre invocaciones.
  */
-let cachedUseCase: AuditBudgetUseCase | undefined;
+let cachedAudit: AuditBudgetUseCase | undefined;
+let cachedDispute: DraftDisputeUseCase | undefined;
 
 export function buildAuditBudgetUseCase(): AuditBudgetUseCase {
-  if (cachedUseCase) return cachedUseCase;
-
+  if (cachedAudit) return cachedAudit;
   const logger = new ConsoleLogger({ service: 'budget-processor-lambda' });
 
-  cachedUseCase = new AuditBudgetUseCase({
+  cachedAudit = new AuditBudgetUseCase({
     supplierRepository: new DynamoDbSupplierRepository(),
     contractRepository: new DynamoDbContractRepository(),
     budgetRepository: new DynamoDbBudgetRepository(),
@@ -30,6 +34,17 @@ export function buildAuditBudgetUseCase(): AuditBudgetUseCase {
     idGenerator: new UuidIdGenerator(),
     logger,
   });
+  return cachedAudit;
+}
 
-  return cachedUseCase;
+export function buildDraftDisputeUseCase(): DraftDisputeUseCase {
+  if (cachedDispute) return cachedDispute;
+  const logger = new ConsoleLogger({ service: 'budget-processor-lambda:dispute' });
+  cachedDispute = new DraftDisputeUseCase({
+    supplierRepository: new DynamoDbSupplierRepository(),
+    budgetRepository: new DynamoDbBudgetRepository(),
+    disputeWriter: new OpenAiDisputeWriterAdapter(),
+    logger,
+  });
+  return cachedDispute;
 }

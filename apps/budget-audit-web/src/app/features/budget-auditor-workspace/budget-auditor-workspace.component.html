@@ -71,39 +71,41 @@
         <h3>Procesando presupuesto...</h3>
         <p>Extrayendo ítems y comparando contra el contrato base.</p>
       </div>
-    } @else if (summary(); as s) {
-      <header class="report-header">
-        <div class="report-header__meta">
-          <h2>Reporte de auditoría</h2>
-          <p>
-            Proveedor: <strong>{{ s.supplierName }}</strong>
-            · Moneda: {{ s.currency }}
-          </p>
-        </div>
+    } @else {
+      @if (summary(); as s) {
+        <header class="report-header">
+          <div class="report-header__meta">
+            <h2>Reporte de auditoría</h2>
+            <p>
+              Proveedor: <strong>{{ s.supplierName }}</strong>
+              · Moneda: {{ s.currency }}
+            </p>
+          </div>
 
-        <div class="kpis">
-          <div class="kpi">
-            <span class="kpi__label">Total cotizado</span>
-            <span class="kpi__value">{{ s.totalAmount | currency:s.currency:'symbol':'1.2-2' }}</span>
+          <div class="kpis">
+            <div class="kpi">
+              <span class="kpi__label">Total cotizado</span>
+              <span class="kpi__value">{{ s.totalAmount | currency:s.currency:'symbol':'1.2-2' }}</span>
+            </div>
+            <div class="kpi kpi--danger">
+              <span class="kpi__label">Sobreprecio total</span>
+              <span class="kpi__value">
+                {{ s.totalDeviationAmount | currency:s.currency:'symbol':'1.2-2' }}
+              </span>
+              <small>{{ s.totalDeviationPercent | number:'1.2-2' }}%</small>
+            </div>
+            <div class="kpi kpi--red">
+              <span class="kpi__label">Alertas críticas</span>
+              <span class="kpi__value">{{ s.redAlertsCount }}</span>
+            </div>
           </div>
-          <div class="kpi kpi--danger">
-            <span class="kpi__label">Sobreprecio total</span>
-            <span class="kpi__value">
-              {{ s.totalDeviationAmount | currency:s.currency:'symbol':'1.2-2' }}
-            </span>
-            <small>{{ s.totalDeviationPercent | number:'1.2-2' }}%</small>
-          </div>
-          <div class="kpi kpi--red">
-            <span class="kpi__label">Alertas críticas</span>
-            <span class="kpi__value">{{ s.redAlertsCount }}</span>
-          </div>
-        </div>
-      </header>
+        </header>
 
-      <app-audit-results-table
-        [rows]="rows()"
-        [currency]="s.currency"
-      ></app-audit-results-table>
+        <app-audit-results-table
+          [rows]="rows()"
+          [currency]="s.currency"
+        ></app-audit-results-table>
+      }
     }
   </main>
 </section>

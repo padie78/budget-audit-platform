@@ -4,6 +4,7 @@ export * from './lib/repositories/dynamodb-budget.repository';
 export * from './lib/repositories/dynamodb-contract.repository';
 export * from './lib/repositories/dynamodb-supplier.repository';
 export * from './lib/ai/openai-budget-extractor.adapter';
+export * from './lib/ai/openai-dispute-writer.adapter';
 export * from './lib/events/appsync-event-publisher.adapter';
 export * from './lib/utils/uuid-id-generator';
 export * from './lib/utils/console-logger';

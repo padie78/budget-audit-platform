@@ -15,7 +15,7 @@ import { BudgetService } from '../../services/budget.service';
 import { BudgetUploadService } from '../../services/budget-upload.service';
 import {
   buildAuditSummary,
-  mapAlertToRow,
+  mapDiscrepancyToRow,
   type AuditResultRow,
   type AuditSummaryVm,
   type AuditWorkspaceState,
@@ -69,7 +69,7 @@ export class BudgetAuditorWorkspaceComponent {
 
   protected readonly rows = computed<readonly AuditResultRow[]>(() => {
     const b = this.budget();
-    return b ? b.alerts.map(mapAlertToRow) : [];
+    return b ? b.discrepancies.map(mapDiscrepancyToRow) : [];
   });
 
   protected readonly isBusy = computed(

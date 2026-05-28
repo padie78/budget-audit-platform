@@ -8,7 +8,7 @@
     "build": "nx run-many --target=build --all",
     "lint": "nx run-many --target=lint --all",
     "test": "nx run-many --target=test --all",
-    "start:web": "nx serve budget-audit-web"
+    "start:web": "WATCHPACK_POLLING=true CHOKIDAR_USEPOLLING=true CHOKIDAR_INTERVAL=1000 nx serve budget-audit-web --poll=1000"
   },
   "dependencies": {
     "@angular/animations": "^17.3.0",
@@ -25,6 +25,8 @@
     "@aws-sdk/s3-request-presigner": "^3.620.0",
     "aws-amplify": "^6.4.0",
     "openai": "^4.55.0",
+    "primeicons": "^7.0.0",
+    "primeng": "^17.18.15",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0",
     "uuid": "^9.0.1",
@@ -45,9 +47,12 @@
     "@types/jest": "^29.5.12",
     "@types/node": "^20.14.0",
     "@types/uuid": "^9.0.8",
+    "autoprefixer": "^10.5.0",
     "esbuild": "^0.19.12",
     "jest": "^29.7.0",
     "nx": "19.5.0",
+    "postcss": "^8.5.15",
+    "tailwindcss": "^3.4.19",
     "ts-jest": "^29.1.5",
     "ts-node": "^10.9.2",
     "typescript": "~5.4.5"

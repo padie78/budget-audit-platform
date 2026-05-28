@@ -1,13 +1,13 @@
 import type {
   AlertSeverity,
-  BudgetAlertDto,
   BudgetDto,
+  PriceDiscrepancyDto,
 } from '@budget-audit/common';
 
 /**
- * Tipos pensados para la capa visual: representan exactamente lo que los
- * componentes UI necesitan, sin acoplarse a la forma de DynamoDB ni a la
- * API GraphQL.
+ * View Models para la capa visual. Aíslan la forma de los DTOs del backend
+ * de los componentes UI; si el contrato GraphQL cambia, solo se ajusta el
+ * mapper.
  */
 export type AuditWorkspaceState =
   | 'idle'
@@ -19,9 +19,11 @@ export type AuditWorkspaceState =
 export interface AuditResultRow {
   sku: string;
   description: string;
+  quantity: number;
   agreedUnitPrice: number | null;
   quotedUnitPrice: number;
   deviationPercent: number;
+  projectedImpact: number;
   severity: AlertSeverity;
   message: string;
 }
@@ -37,23 +39,27 @@ export interface AuditSummaryVm {
   greenAlertsCount: number;
 }
 
-export const mapAlertToRow = (alert: BudgetAlertDto): AuditResultRow => ({
-  sku: alert.sku,
-  description: alert.description,
-  agreedUnitPrice: alert.agreedUnitPrice,
-  quotedUnitPrice: alert.quotedUnitPrice,
-  deviationPercent: alert.deviationPercent,
-  severity: alert.severity,
-  message: alert.message,
+export const mapDiscrepancyToRow = (
+  d: PriceDiscrepancyDto,
+): AuditResultRow => ({
+  sku: d.sku,
+  description: d.description,
+  quantity: d.quantity,
+  agreedUnitPrice: d.agreedUnitPrice,
+  quotedUnitPrice: d.quotedUnitPrice,
+  deviationPercent: d.deviationPercent,
+  projectedImpact: d.projectedImpact,
+  severity: d.severity,
+  message: d.message,
 });
 
 export const buildAuditSummary = (budget: BudgetDto): AuditSummaryVm => ({
   supplierName: budget.extractedBudget?.supplierName ?? budget.supplierId,
-  currency: budget.extractedBudget?.currency ?? 'USD',
+  currency: budget.extractedBudget?.currency ?? budget.currency ?? 'USD',
   totalAmount: budget.extractedBudget?.totalAmount ?? 0,
   totalDeviationAmount: budget.totalDeviationAmount,
   totalDeviationPercent: budget.totalDeviationPercent,
-  redAlertsCount: budget.alerts.filter((a) => a.severity === 'RED').length,
-  yellowAlertsCount: budget.alerts.filter((a) => a.severity === 'YELLOW').length,
-  greenAlertsCount: budget.alerts.filter((a) => a.severity === 'GREEN').length,
+  redAlertsCount: budget.discrepancies.filter((d) => d.severity === 'RED').length,
+  yellowAlertsCount: budget.discrepancies.filter((d) => d.severity === 'YELLOW').length,
+  greenAlertsCount: budget.discrepancies.filter((d) => d.severity === 'GREEN').length,
 });

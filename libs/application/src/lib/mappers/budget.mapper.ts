@@ -1,61 +1,126 @@
 import {
   Budget,
-  type BudgetAlert,
   type ExtractedBudget,
+  type LegalClauseRisk,
+  type PriceDiscrepancy,
+  type ThreeWayMatchResult,
+  type CashFlowProjection,
 } from '@budget-audit/domain';
 import {
-  type BudgetAlertDto,
   type BudgetDto,
   type ExtractedBudgetDto,
+  type LegalClauseRiskDto,
+  type PriceDiscrepancyDto,
+  type ThreeWayMatchResultDto,
+  type CashFlowProjectionDto,
 } from '@budget-audit/common';
 
 export class BudgetMapper {
   static toDto(budget: Budget): BudgetDto {
-    const snapshot = budget.toSnapshot();
+    const snap = budget.toSnapshot();
+    const currency = snap.extractedBudget?.currency ?? snap.totalDeviation?.currency ?? 'USD';
+
     return {
-      id: snapshot.id,
-      supplierId: snapshot.supplierId,
-      contractId: snapshot.contractId,
-      s3Url: snapshot.s3Url,
-      status: snapshot.status,
-      extractedBudget: snapshot.extractedBudget
-        ? BudgetMapper.extractedToDto(snapshot.extractedBudget)
+      id: snap.id,
+      supplierId: snap.supplierId,
+      contractId: snap.contractId,
+      s3Url: snap.s3Url,
+      status: snap.status,
+      decision: snap.decision,
+      currency,
+      extractedBudget: snap.extractedBudget
+        ? BudgetMapper.extractedToDto(snap.extractedBudget)
         : null,
-      alerts: snapshot.alerts.map(BudgetMapper.alertToDto),
-      totalDeviationAmount: snapshot.totalDeviation?.amount ?? 0,
+      discrepancies: snap.discrepancies.map(BudgetMapper.discrepancyToDto),
+      legalRisks: snap.legalRisks.map(BudgetMapper.legalRiskToDto),
+      threeWayMatch: snap.threeWayMatch
+        ? BudgetMapper.threeWayMatchToDto(snap.threeWayMatch)
+        : null,
+      cashFlowProjection: snap.cashFlowProjection
+        ? BudgetMapper.cashFlowToDto(snap.cashFlowProjection)
+        : null,
+      totalDeviationAmount: snap.totalDeviation?.amount ?? 0,
       totalDeviationPercent: budget.totalDeviationPercent,
-      errorMessage: snapshot.errorMessage,
-      createdAt: snapshot.createdAt.toISOString(),
-      updatedAt: snapshot.updatedAt.toISOString(),
+      errorMessage: snap.errorMessage,
+      createdAt: snap.createdAt.toISOString(),
+      updatedAt: snap.updatedAt.toISOString(),
     };
   }
 
-  private static alertToDto(alert: BudgetAlert): BudgetAlertDto {
+  private static discrepancyToDto(d: PriceDiscrepancy): PriceDiscrepancyDto {
     return {
-      sku: alert.sku,
-      description: alert.description,
-      agreedUnitPrice: alert.agreedUnitPrice?.amount ?? null,
-      quotedUnitPrice: alert.quotedUnitPrice.amount,
-      deviationPercent: alert.deviationPercent,
-      severity: alert.severity,
-      message: alert.message,
+      sku: d.sku,
+      description: d.description,
+      quantity: d.quantity,
+      agreedUnitPrice: d.agreedUnitPrice?.amount ?? null,
+      quotedUnitPrice: d.quotedUnitPrice.amount,
+      deviationPercent: d.deviationPercent,
+      deviationPerUnit: d.deviationPerUnit.amount,
+      projectedImpact: d.projectedImpact.amount,
+      severity: d.severity,
+      message: d.message,
     };
   }
 
-  private static extractedToDto(extracted: ExtractedBudget): ExtractedBudgetDto {
+  private static legalRiskToDto(r: LegalClauseRisk): LegalClauseRiskDto {
     return {
-      supplierName: extracted.supplierName,
-      quoteNumber: extracted.quoteNumber,
-      currency: extracted.currency,
-      issuedAt: extracted.issuedAt ? extracted.issuedAt.toISOString() : null,
-      totalAmount: extracted.totalAmount.amount,
-      items: extracted.items.map((item) => ({
-        sku: item.sku,
-        description: item.description,
-        unit: item.unit,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice.amount,
-        lineTotal: item.lineTotal.amount,
+      clauseId: r.clauseId,
+      category: r.category,
+      excerpt: r.excerpt,
+      rationale: r.rationale,
+      modelConfidence: r.modelConfidence,
+      riskScore: r.riskScore,
+      severity: r.severity,
+      suggestion: r.suggestion,
+    };
+  }
+
+  private static threeWayMatchToDto(t: ThreeWayMatchResult): ThreeWayMatchResultDto {
+    return {
+      lines: t.lines.map((l) => ({
+        sku: l.sku,
+        description: l.description,
+        contractPrice: l.contractPrice?.amount ?? null,
+        poPrice: l.poPrice?.amount ?? null,
+        invoicePrice: l.invoicePrice?.amount ?? null,
+        poQuantity: l.poQuantity,
+        invoiceQuantity: l.invoiceQuantity,
+        status: l.status,
+        severity: l.severity,
+        notes: l.notes,
+      })),
+      matchedCount: t.matchedCount,
+      mismatchedCount: t.mismatchedCount,
+      totalAuthorized: t.totalAuthorized.amount,
+      totalInvoiced: t.totalInvoiced.amount,
+      paymentExposure: t.paymentExposure.amount,
+    };
+  }
+
+  private static cashFlowToDto(c: CashFlowProjection): CashFlowProjectionDto {
+    return {
+      monthlyOverrun: c.monthlyOverrun.amount,
+      annualizedOverrun: c.annualizedOverrun.amount,
+      projectedFinalOverrun: c.projectedFinalOverrun.amount,
+      marginErosionPercent: c.marginErosionPercent,
+    };
+  }
+
+  private static extractedToDto(e: ExtractedBudget): ExtractedBudgetDto {
+    return {
+      supplierName: e.supplierName,
+      quoteNumber: e.quoteNumber,
+      currency: e.currency,
+      issuedAt: e.issuedAt ? e.issuedAt.toISOString() : null,
+      totalAmount: e.totalAmount.amount,
+      legalText: e.legalText,
+      items: e.items.map((it) => ({
+        sku: it.sku,
+        description: it.description,
+        unit: it.unit,
+        quantity: it.quantity,
+        unitPrice: it.unitPrice.amount,
+        lineTotal: it.lineTotal.amount,
       })),
     };
   }

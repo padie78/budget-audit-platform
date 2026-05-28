@@ -56,11 +56,20 @@ export const handler: AppSyncResolverHandler<
       const supplier = await suppliers().findById(op.args.supplierId);
       if (!supplier) return null;
       const snap = supplier.toJSON();
+      const policy = snap.thresholdPolicy;
+      const currency = policy.absolute?.currency ?? policy.autoApprovalLimit?.currency ?? 'USD';
       return {
         id: snap.id,
         name: snap.name,
         taxId: snap.taxId,
         contactEmail: snap.contactEmail,
+        fidelityScore: snap.fidelityScore,
+        thresholdPolicy: {
+          percentTolerance: policy.percent,
+          absoluteTolerance: policy.absolute?.amount ?? null,
+          autoApprovalUpTo: policy.autoApprovalLimit?.amount ?? null,
+          currency,
+        },
         createdAt: snap.createdAt.toISOString(),
         updatedAt: snap.updatedAt.toISOString(),
       };

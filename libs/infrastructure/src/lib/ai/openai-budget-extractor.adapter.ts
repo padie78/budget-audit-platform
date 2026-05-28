@@ -1,40 +1,43 @@
 import OpenAI from 'openai';
 import {
   BudgetExtractionError,
+  LegalClauseRisk,
   Money,
   type AiExtractionInput,
-  type ExtractedBudget,
+  type AiExtractionResult,
   type ExtractedBudgetItem,
   type IAiExtractorService,
+  type LegalRiskCategory,
 } from '@budget-audit/domain';
 import {
-  ExtractedBudgetJsonSchema,
-  ExtractedBudgetSchema,
+  ExtractedDocumentJsonSchema,
+  ExtractedDocumentSchema,
 } from './budget-extraction.schema';
 
 export interface OpenAiExtractorOptions {
   apiKey?: string;
   model?: string;
-  /** Prompt del sistema. Puede sobreescribirse para fine-tuning por industria. */
   systemPrompt?: string;
 }
 
-const DEFAULT_SYSTEM_PROMPT = `Eres un experto en auditoría de presupuestos B2B.
-Recibirás un PDF (referenciado por URL en S3) que contiene un presupuesto
-emitido por un proveedor. Extrae cada ítem con su SKU, descripción, unidad,
-cantidad, precio unitario y total de línea. Devuelve los datos EXACTAMENTE
-según el JSON Schema provisto. No inventes ítems ni precios. Si un dato no
-está presente, usa null cuando el schema lo permita.`;
+const DEFAULT_SYSTEM_PROMPT = `Eres un auditor experto en compras B2B.
+Recibirás un documento del ciclo de compras (cotización, contrato, OC o factura)
+referenciado por URL en S3. Realiza DOS tareas:
+
+  1) Extrae cada ítem (SKU, descripción, unidad, cantidad, precio unitario y
+     total de línea). No inventes ítems ni precios.
+  2) Identifica cláusulas legales con riesgo (penalidades, liability, plazos
+     de pago abusivos, terminación unilateral, ajustes de precio, SLA, etc.)
+     y asigna riskScore [0,1] y modelConfidence [0,1].
+
+Devuelve EXACTAMENTE el JSON definido por el schema. Para riesgos usa
+clauseId del estilo "CL-N" con N incremental. Si no hay texto legal, deja
+legalText=null y legalRisks=[].`;
 
 /**
- * Adaptador del puerto IAiExtractorService basado en OpenAI Structured Outputs.
- *
- *  - Usa `response_format: { type: 'json_schema', json_schema: {...} }` con
- *    `strict: true` para garantizar conformidad estructural.
- *  - Valida la respuesta una segunda vez con Zod antes de mapearla al dominio,
- *    como defensa en profundidad.
- *  - Puede intercambiarse trivialmente por un adaptador Bedrock (Anthropic /
- *    Llama) manteniendo la misma firma del puerto.
+ * Adaptador del puerto IAiExtractorService basado en OpenAI Structured
+ * Outputs. Una sola llamada al LLM devuelve la data tabular Y los riesgos
+ * legales, manteniendo costo y latencia bajos.
  */
 export class OpenAiBudgetExtractorAdapter implements IAiExtractorService {
   private readonly client: OpenAI;
@@ -43,52 +46,45 @@ export class OpenAiBudgetExtractorAdapter implements IAiExtractorService {
 
   constructor(options: OpenAiExtractorOptions = {}) {
     const apiKey = options.apiKey ?? process.env['OPENAI_API_KEY'];
-    if (!apiKey) {
-      throw new Error('OPENAI_API_KEY no está configurada.');
-    }
+    if (!apiKey) throw new Error('OPENAI_API_KEY no está configurada.');
+
     this.client = new OpenAI({ apiKey });
     this.model = options.model ?? process.env['OPENAI_MODEL'] ?? 'gpt-4o-2024-08-06';
     this.systemPrompt = options.systemPrompt ?? DEFAULT_SYSTEM_PROMPT;
   }
 
-  async extract(input: AiExtractionInput): Promise<ExtractedBudget> {
-    const userPrompt = this.buildUserPrompt(input);
-
+  async extract(input: AiExtractionInput): Promise<AiExtractionResult> {
     const completion = await this.client.chat.completions.create({
       model: this.model,
       temperature: 0,
       messages: [
         { role: 'system', content: this.systemPrompt },
-        { role: 'user', content: userPrompt },
+        { role: 'user', content: this.buildUserPrompt(input) },
       ],
       response_format: {
         type: 'json_schema',
         json_schema: {
-          name: 'ExtractedBudget',
+          name: 'ExtractedDocument',
           strict: true,
-          schema: ExtractedBudgetJsonSchema as Record<string, unknown>,
+          schema: ExtractedDocumentJsonSchema as Record<string, unknown>,
         },
       },
     });
 
     const raw = completion.choices[0]?.message?.content;
-    if (!raw) {
-      throw new BudgetExtractionError('Respuesta vacía del LLM.');
-    }
+    if (!raw) throw new BudgetExtractionError('Respuesta vacía del LLM.');
 
     let parsed: unknown;
     try {
       parsed = JSON.parse(raw);
     } catch (err) {
-      throw new BudgetExtractionError(
-        `JSON inválido del LLM: ${(err as Error).message}`,
-      );
+      throw new BudgetExtractionError(`JSON inválido del LLM: ${(err as Error).message}`);
     }
 
-    const validation = ExtractedBudgetSchema.safeParse(parsed);
+    const validation = ExtractedDocumentSchema.safeParse(parsed);
     if (!validation.success) {
       throw new BudgetExtractionError(
-        `Respuesta no cumple el schema: ${validation.error.message}`,
+        `Schema mismatch: ${validation.error.message}`,
       );
     }
 
@@ -96,18 +92,17 @@ export class OpenAiBudgetExtractorAdapter implements IAiExtractorService {
   }
 
   private buildUserPrompt(input: AiExtractionInput): string {
-    const currencyHint = input.expectedCurrency
-      ? `\nMoneda esperada: ${input.expectedCurrency}.`
-      : '';
-    const supplierHint = input.supplierName
-      ? `\nProveedor declarado: ${input.supplierName}.`
-      : '';
-    return `Analiza el presupuesto ubicado en: ${input.s3Url}.${supplierHint}${currencyHint}\nExtrae todos los ítems con sus precios.`;
+    const parts = [`Documento: ${input.s3Url}`];
+    if (input.documentKind) parts.push(`Tipo de documento: ${input.documentKind}`);
+    if (input.supplierName) parts.push(`Proveedor declarado: ${input.supplierName}`);
+    if (input.expectedCurrency) parts.push(`Moneda esperada: ${input.expectedCurrency}`);
+    parts.push('Extrae ítems y riesgos legales.');
+    return parts.join('\n');
   }
 
   private toDomain(
-    data: import('./budget-extraction.schema').ExtractedBudgetSchemaType,
-  ): ExtractedBudget {
+    data: import('./budget-extraction.schema').ExtractedDocumentSchemaType,
+  ): AiExtractionResult {
     const items: ExtractedBudgetItem[] = data.items.map((it) => ({
       sku: it.sku,
       description: it.description,
@@ -117,13 +112,29 @@ export class OpenAiBudgetExtractorAdapter implements IAiExtractorService {
       lineTotal: Money.from(it.lineTotal, data.currency),
     }));
 
+    const legalRisks = data.legalRisks.map((r) =>
+      LegalClauseRisk.of({
+        clauseId: r.clauseId,
+        category: r.category as LegalRiskCategory,
+        excerpt: r.excerpt,
+        rationale: r.rationale,
+        modelConfidence: r.modelConfidence,
+        riskScore: r.riskScore,
+        suggestion: r.suggestion,
+      }),
+    );
+
     return {
-      supplierName: data.supplierName,
-      quoteNumber: data.quoteNumber,
-      currency: data.currency,
-      issuedAt: data.issuedAt ? new Date(data.issuedAt) : null,
-      items,
-      totalAmount: Money.from(data.totalAmount, data.currency),
+      budget: {
+        supplierName: data.supplierName,
+        quoteNumber: data.quoteNumber,
+        currency: data.currency,
+        issuedAt: data.issuedAt ? new Date(data.issuedAt) : null,
+        items,
+        totalAmount: Money.from(data.totalAmount, data.currency),
+        legalText: data.legalText ?? undefined,
+      },
+      legalRisks,
     };
   }
 }

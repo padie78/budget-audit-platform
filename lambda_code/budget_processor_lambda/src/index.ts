@@ -1,12 +1,13 @@
 import type { AppSyncResolverHandler } from 'aws-lambda';
-import type {
-  AuditBudgetInput,
-  AuditBudgetMutationResult,
-} from '@budget-audit/common';
-import { buildAuditBudgetUseCase } from './composition-root';
+import type { AuditBudgetInput, BudgetDto } from '@budget-audit/common';
+import { buildAuditBudgetUseCase, buildDraftDisputeUseCase } from './composition-root';
 
 interface AuditBudgetArgs {
   input: AuditBudgetInput;
+}
+
+interface DraftDisputeArgs {
+  input: { supplierId: string; budgetId: string };
 }
 
 /**
@@ -19,21 +20,40 @@ interface AuditBudgetArgs {
  * para clientes que estén escuchando en vivo.
  */
 export const handler: AppSyncResolverHandler<
-  AuditBudgetArgs,
-  AuditBudgetMutationResult
+  AuditBudgetArgs | DraftDisputeArgs,
+  BudgetDto
 > = async (event) => {
-  const useCase = buildAuditBudgetUseCase();
-  const input = event.arguments.input;
+  const fieldName = event.info.fieldName;
+  const input = (event.arguments as any).input;
 
-  if (!input?.supplierId || !input?.s3Url) {
-    throw new Error('supplierId y s3Url son requeridos.');
+  if (fieldName === 'auditBudget') {
+    const useCase = buildAuditBudgetUseCase();
+    if (!input?.supplierId || !input?.s3Url) {
+      throw new Error('supplierId y s3Url son requeridos.');
+    }
+
+    const result = await useCase.execute({
+      supplierId: input.supplierId,
+      s3Url: input.s3Url,
+      contractId: input.contractId,
+      poS3Url: input.poS3Url,
+      invoiceS3Url: input.invoiceS3Url,
+      projectDurationMonths: input.projectDurationMonths,
+      elapsedMonths: input.elapsedMonths,
+    });
+
+    return result.budget;
   }
 
-  const result = await useCase.execute({
-    supplierId: input.supplierId,
-    s3Url: input.s3Url,
-    contractId: input.contractId,
-  });
+  if (fieldName === 'draftDisputeEmail') {
+    const useCase = buildDraftDisputeUseCase();
+    if (!input?.supplierId || !input?.budgetId) {
+      throw new Error('supplierId y budgetId son requeridos.');
+    }
+    const res = await useCase.execute({ supplierId: input.supplierId, budgetId: input.budgetId });
+    // AppSync schema devolvería otro type; en MVP lo resolvemos en el schema en siguiente paso.
+    return (res as any).email;
+  }
 
-  return result.budget;
+  throw new Error(`Field no soportado: ${fieldName}`);
 };

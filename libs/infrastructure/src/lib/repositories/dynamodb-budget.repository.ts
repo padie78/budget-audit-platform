@@ -4,59 +4,56 @@ import {
   QueryCommand,
 } from '@aws-sdk/lib-dynamodb';
 import {
+  AuditDecision,
   AuditStatus,
   Budget,
+  CashFlowProjection,
+  LegalClauseRisk,
   Money,
-  type BudgetAlert,
+  PriceDiscrepancy,
+  ThresholdPolicy,
+  type AlertSeverity,
   type ExtractedBudget,
   type ExtractedBudgetItem,
   type IBudgetRepository,
+  type LegalRiskCategory,
+  type ThreeWayMatchLine,
+  type ThreeWayMatchResult,
 } from '@budget-audit/domain';
+import {
+  BudgetMapper,
+} from '@budget-audit/application';
 import {
   DynamoKeys,
   EntityType,
   KeyPrefix,
-  type BudgetAlertDto,
-  type ExtractedBudgetDto,
+  type BudgetDto,
 } from '@budget-audit/common';
 import { getDocumentClient } from '../aws/dynamodb-client.factory';
 
-interface BudgetItem {
+interface BudgetItem extends BudgetDto {
   PK: string;
   SK: string;
   GSI1PK: string;
   GSI1SK: string;
   entityType: typeof EntityType.BudgetAudit;
-  id: string;
-  supplierId: string;
-  contractId: string | null;
-  s3Url: string;
-  status: AuditStatus;
-  extractedBudget: ExtractedBudgetDto | null;
-  alerts: BudgetAlertDto[];
-  totalDeviationAmount: number;
-  currency: string;
-  errorMessage?: string;
-  createdAt: string;
-  updatedAt: string;
 }
 
+/**
+ * Repositorio del agregado Budget. Persiste la entidad serializándola al
+ * mismo shape que el DTO público (idempotente y barato de mapear de vuelta).
+ */
 export class DynamoDbBudgetRepository implements IBudgetRepository {
   constructor(
     private readonly tableName: string = process.env['TABLE_NAME'] ?? '',
     private readonly client = getDocumentClient(),
   ) {
-    if (!this.tableName) {
-      throw new Error('TABLE_NAME env variable es requerida.');
-    }
+    if (!this.tableName) throw new Error('TABLE_NAME env variable es requerida.');
   }
 
   async save(budget: Budget): Promise<void> {
     const snap = budget.toSnapshot();
-    const currency =
-      snap.extractedBudget?.currency ??
-      snap.totalDeviation?.currency ??
-      'USD';
+    const dto = BudgetMapper.toDto(budget);
 
     const keys = DynamoKeys.audit(
       snap.supplierId,
@@ -68,31 +65,13 @@ export class DynamoDbBudgetRepository implements IBudgetRepository {
     const item: BudgetItem = {
       ...keys,
       entityType: EntityType.BudgetAudit,
-      id: snap.id,
-      supplierId: snap.supplierId,
-      contractId: snap.contractId,
-      s3Url: snap.s3Url,
-      status: snap.status,
-      extractedBudget: snap.extractedBudget
-        ? this.serializeExtracted(snap.extractedBudget)
-        : null,
-      alerts: snap.alerts.map((a) => this.serializeAlert(a)),
-      totalDeviationAmount: snap.totalDeviation?.amount ?? 0,
-      currency,
-      errorMessage: snap.errorMessage,
-      createdAt: snap.createdAt.toISOString(),
-      updatedAt: snap.updatedAt.toISOString(),
+      ...dto,
     };
 
-    await this.client.send(
-      new PutCommand({ TableName: this.tableName, Item: item }),
-    );
+    await this.client.send(new PutCommand({ TableName: this.tableName, Item: item }));
   }
 
-  async findById(
-    supplierId: string,
-    budgetId: string,
-  ): Promise<Budget | null> {
+  async findById(supplierId: string, budgetId: string): Promise<Budget | null> {
     const res = await this.client.send(
       new GetCommand({
         TableName: this.tableName,
@@ -119,55 +98,21 @@ export class DynamoDbBudgetRepository implements IBudgetRepository {
         ScanIndexForward: false,
       }),
     );
-    return (res.Items as BudgetItem[] | undefined)?.map((it) =>
-      this.toEntity(it),
-    ) ?? [];
-  }
-
-  private serializeExtracted(extracted: ExtractedBudget): ExtractedBudgetDto {
-    return {
-      supplierName: extracted.supplierName,
-      quoteNumber: extracted.quoteNumber,
-      currency: extracted.currency,
-      issuedAt: extracted.issuedAt ? extracted.issuedAt.toISOString() : null,
-      totalAmount: extracted.totalAmount.amount,
-      items: extracted.items.map((it) => ({
-        sku: it.sku,
-        description: it.description,
-        unit: it.unit,
-        quantity: it.quantity,
-        unitPrice: it.unitPrice.amount,
-        lineTotal: it.lineTotal.amount,
-      })),
-    };
-  }
-
-  private serializeAlert(alert: BudgetAlert): BudgetAlertDto {
-    return {
-      sku: alert.sku,
-      description: alert.description,
-      agreedUnitPrice: alert.agreedUnitPrice?.amount ?? null,
-      quotedUnitPrice: alert.quotedUnitPrice.amount,
-      deviationPercent: alert.deviationPercent,
-      severity: alert.severity,
-      message: alert.message,
-    };
+    return ((res.Items as BudgetItem[] | undefined) ?? []).map((it) => this.toEntity(it));
   }
 
   private toEntity(item: BudgetItem): Budget {
     const currency = item.currency;
+    const policy = ThresholdPolicy.default(currency);
+
     const extracted: ExtractedBudget | null = item.extractedBudget
       ? {
           supplierName: item.extractedBudget.supplierName,
           quoteNumber: item.extractedBudget.quoteNumber,
           currency: item.extractedBudget.currency,
-          issuedAt: item.extractedBudget.issuedAt
-            ? new Date(item.extractedBudget.issuedAt)
-            : null,
-          totalAmount: Money.from(
-            item.extractedBudget.totalAmount,
-            item.extractedBudget.currency,
-          ),
+          issuedAt: item.extractedBudget.issuedAt ? new Date(item.extractedBudget.issuedAt) : null,
+          totalAmount: Money.from(item.extractedBudget.totalAmount, item.extractedBudget.currency),
+          legalText: item.extractedBudget.legalText,
           items: item.extractedBudget.items.map<ExtractedBudgetItem>((it) => ({
             sku: it.sku,
             description: it.description,
@@ -179,25 +124,73 @@ export class DynamoDbBudgetRepository implements IBudgetRepository {
         }
       : null;
 
-    const alerts: BudgetAlert[] = item.alerts.map((a) => ({
-      sku: a.sku,
-      description: a.description,
-      agreedUnitPrice:
-        a.agreedUnitPrice !== null ? Money.from(a.agreedUnitPrice, currency) : null,
-      quotedUnitPrice: Money.from(a.quotedUnitPrice, currency),
-      deviationPercent: a.deviationPercent,
-      severity: a.severity,
-      message: a.message,
-    }));
+    const discrepancies: PriceDiscrepancy[] = item.discrepancies.map((d) =>
+      PriceDiscrepancy.compute({
+        sku: d.sku,
+        description: d.description,
+        quantity: d.quantity,
+        quotedUnitPrice: Money.from(d.quotedUnitPrice, currency),
+        agreedUnitPrice:
+          d.agreedUnitPrice !== null ? Money.from(d.agreedUnitPrice, currency) : null,
+        policy,
+      }),
+    );
+
+    const legalRisks: LegalClauseRisk[] = item.legalRisks.map((r) =>
+      LegalClauseRisk.of({
+        clauseId: r.clauseId,
+        category: r.category as LegalRiskCategory,
+        excerpt: r.excerpt,
+        rationale: r.rationale,
+        modelConfidence: r.modelConfidence,
+        riskScore: r.riskScore,
+        suggestion: r.suggestion,
+      }),
+    );
+
+    const threeWayMatch: ThreeWayMatchResult | null = item.threeWayMatch
+      ? {
+          lines: item.threeWayMatch.lines.map<ThreeWayMatchLine>((l) => ({
+            sku: l.sku,
+            description: l.description,
+            contractPrice: l.contractPrice !== null ? Money.from(l.contractPrice, currency) : null,
+            poPrice: l.poPrice !== null ? Money.from(l.poPrice, currency) : null,
+            invoicePrice: l.invoicePrice !== null ? Money.from(l.invoicePrice, currency) : null,
+            poQuantity: l.poQuantity,
+            invoiceQuantity: l.invoiceQuantity,
+            status: l.status,
+            severity: l.severity as AlertSeverity,
+            notes: l.notes,
+          })),
+          matchedCount: item.threeWayMatch.matchedCount,
+          mismatchedCount: item.threeWayMatch.mismatchedCount,
+          totalAuthorized: Money.from(item.threeWayMatch.totalAuthorized, currency),
+          totalInvoiced: Money.from(item.threeWayMatch.totalInvoiced, currency),
+          paymentExposure: Money.from(item.threeWayMatch.paymentExposure, currency),
+        }
+      : null;
+
+    const cashFlow: CashFlowProjection | null = item.cashFlowProjection
+      ? CashFlowProjection.compute({
+          totalDeviation: Money.from(item.totalDeviationAmount, currency),
+          contractValue: Money.from(item.extractedBudget?.totalAmount ?? 0, currency),
+          projectDurationMonths: 0,
+          elapsedMonths: 1,
+        })
+      : null;
 
     return Budget.rehydrate({
       id: item.id,
       supplierId: item.supplierId,
       contractId: item.contractId,
       s3Url: item.s3Url,
-      status: item.status,
+      status: item.status as AuditStatus,
+      decision: (item.decision as AuditDecision) ?? AuditDecision.Pending,
       extractedBudget: extracted,
-      alerts,
+      discrepancies,
+      legalRisks,
+      threeWayMatch,
+      cashFlowProjection: cashFlow,
       totalDeviation: Money.from(item.totalDeviationAmount, currency),
       errorMessage: item.errorMessage,
       createdAt: new Date(item.createdAt),
