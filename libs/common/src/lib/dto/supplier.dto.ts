@@ -56,6 +56,27 @@ export interface VendorPerformanceDto {
   /** 0..1, % de entregas a tiempo según SLA. */
   slaDeliveryComplianceRate: number;
   trend: 'IMPROVING' | 'STABLE' | 'DEGRADING';
+  /** Etapa del ciclo de vida operacional. */
+  onboardingStatus?:
+    | 'PENDING_FIRST_INVOICE'
+    | 'ACTIVE'
+    | 'OFFBOARDING'
+    | 'ARCHIVED';
+}
+
+/**
+ * Compliance & Risk — estado regulatorio, certificaciones y huella ESG.
+ * Drives sourcing decisions y reportes corporativos.
+ */
+export interface ComplianceAndRiskDto {
+  status: 'ACTIVE' | 'SUSPENDED' | 'BLOCKED' | 'INACTIVE';
+  /** ISO timestamp de la última auditoría compliance/ESG/legal. */
+  lastAuditDate: string;
+  certifications: string[];
+  /** 0..100 — score ESG compuesto. */
+  esgComplianceScore: number;
+  /** Categoría operacional principal (RAW_MATERIALS, LOGISTICS, ...). */
+  primarySectorCode: string;
 }
 
 /**
@@ -93,6 +114,7 @@ export interface CreateSupplierInputDto {
   strategicIntelligence?: StrategicIntelligenceDto;
   vendorPerformance?: VendorPerformanceDto;
   smartThresholds?: SmartThresholdsDto;
+  complianceAndRisk?: ComplianceAndRiskDto;
 }
 
 export interface UpdateSupplierInputDto {
@@ -108,6 +130,7 @@ export interface UpdateSupplierInputDto {
   strategicIntelligence?: StrategicIntelligenceDto;
   vendorPerformance?: VendorPerformanceDto;
   smartThresholds?: SmartThresholdsDto;
+  complianceAndRisk?: ComplianceAndRiskDto;
 }
 
 export interface DeleteSupplierResultDto {
@@ -136,4 +159,5 @@ export interface SupplierDto {
   strategicIntelligence?: StrategicIntelligenceDto;
   vendorPerformance?: VendorPerformanceDto;
   smartThresholds?: SmartThresholdsDto;
+  complianceAndRisk?: ComplianceAndRiskDto;
 }

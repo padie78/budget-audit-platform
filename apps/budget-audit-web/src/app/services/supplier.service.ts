@@ -76,6 +76,7 @@ const SUPPLIER_FIELDS = /* GraphQL */ `
     averageDisputeResolutionDays
     slaDeliveryComplianceRate
     trend
+    onboardingStatus
   }
   strategicIntelligence {
     riskProfile {
@@ -96,6 +97,13 @@ const SUPPLIER_FIELDS = /* GraphQL */ `
       category
       tolerancePercentage
     }
+  }
+  complianceAndRisk {
+    status
+    lastAuditDate
+    certifications
+    esgComplianceScore
+    primarySectorCode
   }
   createdAt
   updatedAt

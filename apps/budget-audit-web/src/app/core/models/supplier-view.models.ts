@@ -23,6 +23,17 @@ export interface SupplierRowVm {
   /** 'LOW' | 'MEDIUM' | 'HIGH' | 'STRATEGIC' */
   criticality?: string;
 
+  // ─────────── Compliance & ESG ───────────
+  status?: 'ACTIVE' | 'SUSPENDED' | 'BLOCKED' | 'INACTIVE';
+  onboardingStatus?:
+    | 'PENDING_FIRST_INVOICE'
+    | 'ACTIVE'
+    | 'OFFBOARDING'
+    | 'ARCHIVED';
+  primarySectorCode?: string;
+  esgComplianceScore?: number;
+  certifications?: string[];
+
   updatedAt: string;
 }
 
@@ -40,6 +51,11 @@ export function toSupplierRowVm(dto: SupplierDto): SupplierRowVm {
     riskLevel: dto.strategicIntelligence?.riskProfile.level,
     trend: dto.vendorPerformance?.trend,
     criticality: dto.strategicIntelligence?.criticalityIndex,
+    status: dto.complianceAndRisk?.status,
+    onboardingStatus: dto.vendorPerformance?.onboardingStatus,
+    primarySectorCode: dto.complianceAndRisk?.primarySectorCode,
+    esgComplianceScore: dto.complianceAndRisk?.esgComplianceScore,
+    certifications: dto.complianceAndRisk?.certifications,
     updatedAt: dto.updatedAt,
   };
 }

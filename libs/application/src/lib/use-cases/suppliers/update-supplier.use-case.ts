@@ -1,4 +1,5 @@
 import {
+  ComplianceAndRisk,
   Money,
   PaymentStrategy,
   RiskProfile,
@@ -12,6 +13,7 @@ import {
   type SupplierContactInfo,
 } from '@budget-audit/domain';
 import type {
+  ComplianceAndRiskDto,
   SmartThresholdsDto,
   StrategicIntelligenceDto,
   SupplierContactInfoDto,
@@ -71,6 +73,9 @@ export class UpdateSupplierUseCase {
       vendorPerformance: input.vendorPerformance
         ? this.buildVendorPerformance(input.vendorPerformance)
         : snap.vendorPerformance,
+      complianceAndRisk: input.complianceAndRisk
+        ? this.buildComplianceAndRisk(input.complianceAndRisk)
+        : snap.complianceAndRisk,
       versionId: (snap.versionId ?? 1) + 1,
       createdAt: snap.createdAt,
       updatedAt: new Date(),
@@ -137,6 +142,18 @@ export class UpdateSupplierUseCase {
       totalAuditedDocs: Math.max(0, v.totalAuditedDocs | 0),
       totalDisputesRaised: Math.max(0, v.totalDisputesRaised | 0),
       averageDisputeResolutionDays: Math.max(0, v.averageDisputeResolutionDays),
+      onboardingStatus: v.onboardingStatus ?? 'PENDING_FIRST_INVOICE',
+    });
+  }
+
+  private buildComplianceAndRisk(c: ComplianceAndRiskDto): ComplianceAndRisk {
+    const esg = Math.max(0, Math.min(100, c.esgComplianceScore ?? 0));
+    return ComplianceAndRisk.of({
+      status: c.status ?? 'ACTIVE',
+      lastAuditDate: c.lastAuditDate ? new Date(c.lastAuditDate) : new Date(),
+      certifications: Array.isArray(c.certifications) ? c.certifications : [],
+      esgComplianceScore: esg,
+      primarySectorCode: c.primarySectorCode?.trim() || 'GENERAL',
     });
   }
 }

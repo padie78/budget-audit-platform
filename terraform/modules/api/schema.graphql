@@ -34,6 +34,20 @@ enum VendorTrend {
   DEGRADING
 }
 
+enum OnboardingStatus {
+  PENDING_FIRST_INVOICE
+  ACTIVE
+  OFFBOARDING
+  ARCHIVED
+}
+
+enum SupplierStatus {
+  ACTIVE
+  SUSPENDED
+  BLOCKED
+  INACTIVE
+}
+
 # ─────────── Supplier core + extensiones enterprise (opcionales) ───────────
 
 type ThresholdPolicy {
@@ -74,6 +88,15 @@ type VendorPerformance {
   averageDisputeResolutionDays: Float!
   slaDeliveryComplianceRate: Float!
   trend: VendorTrend!
+  onboardingStatus: OnboardingStatus
+}
+
+type ComplianceAndRisk {
+  status: SupplierStatus!
+  lastAuditDate: AWSDateTime!
+  certifications: [String!]!
+  esgComplianceScore: Float!
+  primarySectorCode: String!
 }
 
 type SmartThresholdCategoryEntry {
@@ -103,6 +126,7 @@ type Supplier {
   strategicIntelligence: StrategicIntelligence
   vendorPerformance: VendorPerformance
   smartThresholds: SmartThresholds
+  complianceAndRisk: ComplianceAndRisk
 }
 
 type DeleteSupplierResult {
@@ -204,6 +228,15 @@ input VendorPerformanceInput {
   averageDisputeResolutionDays: Float!
   slaDeliveryComplianceRate: Float!
   trend: VendorTrend!
+  onboardingStatus: OnboardingStatus
+}
+
+input ComplianceAndRiskInput {
+  status: SupplierStatus!
+  lastAuditDate: AWSDateTime!
+  certifications: [String!]!
+  esgComplianceScore: Float!
+  primarySectorCode: String!
 }
 
 input SmartThresholdCategoryEntryInput {
@@ -228,6 +261,7 @@ input CreateSupplierInput {
   strategicIntelligence: StrategicIntelligenceInput
   vendorPerformance: VendorPerformanceInput
   smartThresholds: SmartThresholdsInput
+  complianceAndRisk: ComplianceAndRiskInput
 }
 
 input UpdateSupplierInput {
@@ -243,6 +277,7 @@ input UpdateSupplierInput {
   strategicIntelligence: StrategicIntelligenceInput
   vendorPerformance: VendorPerformanceInput
   smartThresholds: SmartThresholdsInput
+  complianceAndRisk: ComplianceAndRiskInput
 }
 
 input AuditBudgetInput {

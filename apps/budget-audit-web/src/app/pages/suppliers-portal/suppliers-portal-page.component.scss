@@ -365,6 +365,24 @@
   }
 }
 
+.cell-sector {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: #334155;
+  padding: 0.2rem 0.55rem;
+  border-radius: 6px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+
+  i {
+    font-size: 0.75rem;
+    color: #64748b;
+  }
+}
+
 .row-actions {
   display: flex;
   justify-content: flex-end;

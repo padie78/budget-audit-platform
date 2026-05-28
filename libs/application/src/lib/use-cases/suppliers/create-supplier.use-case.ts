@@ -1,4 +1,5 @@
 import {
+  ComplianceAndRisk,
   DEFAULT_ENTITY_ID,
   Money,
   PaymentStrategy,
@@ -12,6 +13,7 @@ import {
   type SupplierContactInfo,
 } from '@budget-audit/domain';
 import type {
+  ComplianceAndRiskDto,
   CreateSupplierInputDto,
   SmartThresholdsDto,
   StrategicIntelligenceDto,
@@ -72,6 +74,10 @@ export class CreateSupplierUseCase {
       smartThresholds: this.buildSmartThresholds(
         input.smartThresholds,
         policy.percent,
+      ),
+      complianceAndRisk: this.buildComplianceAndRisk(
+        input.complianceAndRisk,
+        now,
       ),
       versionId: 1,
       createdAt: now,
@@ -166,6 +172,7 @@ export class CreateSupplierUseCase {
       averageDisputeResolutionDays: 0,
       slaDeliveryComplianceRate: 1,
       trend: 'STABLE' as const,
+      onboardingStatus: 'PENDING_FIRST_INVOICE' as const,
     };
     return VendorPerformance.of({
       ...src,
@@ -177,6 +184,32 @@ export class CreateSupplierUseCase {
         0,
         src.averageDisputeResolutionDays,
       ),
+      onboardingStatus: src.onboardingStatus ?? 'PENDING_FIRST_INVOICE',
+    });
+  }
+
+  private buildComplianceAndRisk(
+    c: ComplianceAndRiskDto | undefined,
+    now: Date,
+  ): ComplianceAndRisk {
+    const src: ComplianceAndRiskDto = c ?? {
+      status: 'ACTIVE',
+      lastAuditDate: now.toISOString(),
+      certifications: [],
+      esgComplianceScore: 0,
+      primarySectorCode: 'GENERAL',
+    };
+    const esg = Math.max(0, Math.min(100, src.esgComplianceScore ?? 0));
+    return ComplianceAndRisk.of({
+      status: src.status ?? 'ACTIVE',
+      lastAuditDate: src.lastAuditDate
+        ? new Date(src.lastAuditDate)
+        : now,
+      certifications: Array.isArray(src.certifications)
+        ? src.certifications
+        : [],
+      esgComplianceScore: esg,
+      primarySectorCode: src.primarySectorCode?.trim() || 'GENERAL',
     });
   }
 

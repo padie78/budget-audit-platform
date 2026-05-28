@@ -17,6 +17,7 @@ import {
 
 import { ButtonModule } from 'primeng/button';
 import { CardModule } from 'primeng/card';
+import { ChipsModule } from 'primeng/chips';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { ConfirmationService, MessageService } from 'primeng/api';
 import { DialogModule } from 'primeng/dialog';
@@ -24,6 +25,7 @@ import { DropdownModule } from 'primeng/dropdown';
 import { InputNumberModule } from 'primeng/inputnumber';
 import { InputTextModule } from 'primeng/inputtext';
 import { ProgressSpinnerModule } from 'primeng/progressspinner';
+import { SliderModule } from 'primeng/slider';
 import { TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
 import { ToastModule } from 'primeng/toast';
@@ -71,12 +73,14 @@ import {
     ReactiveFormsModule,
     ButtonModule,
     CardModule,
+    ChipsModule,
     ConfirmDialogModule,
     DialogModule,
     DropdownModule,
     InputNumberModule,
     InputTextModule,
     ProgressSpinnerModule,
+    SliderModule,
     TableModule,
     TagModule,
     ToastModule,
@@ -139,6 +143,23 @@ export class SuppliersPortalPageComponent {
     { label: 'Madrid', value: 'MADRID' },
   ];
 
+  protected readonly statusOptions = [
+    { label: 'Activo', value: 'ACTIVE' },
+    { label: 'Suspendido', value: 'SUSPENDED' },
+    { label: 'Bloqueado', value: 'BLOCKED' },
+    { label: 'Inactivo', value: 'INACTIVE' },
+  ];
+
+  protected readonly sectorOptions = [
+    { label: 'Raw materials', value: 'RAW_MATERIALS' },
+    { label: 'Logistics', value: 'LOGISTICS' },
+    { label: 'Maintenance', value: 'MAINTENANCE' },
+    { label: 'IT services', value: 'IT_SERVICES' },
+    { label: 'Marketing', value: 'MARKETING' },
+    { label: 'Energy', value: 'ENERGY' },
+    { label: 'General', value: 'GENERAL' },
+  ];
+
   protected readonly form: FormGroup = this.fb.group({
     entityId: ['GLOBAL', [Validators.required]],
     name: ['', [Validators.required, Validators.minLength(2)]],
@@ -151,6 +172,15 @@ export class SuppliersPortalPageComponent {
     currency: ['USD', [Validators.required]],
     autoApprovalUpTo: [null],
     criticality: ['MEDIUM'],
+
+    // ─────────── Compliance & ESG ───────────
+    status: ['ACTIVE', [Validators.required]],
+    primarySectorCode: ['GENERAL', [Validators.required]],
+    esgComplianceScore: [
+      75,
+      [Validators.required, Validators.min(0), Validators.max(100)],
+    ],
+    certifications: [[] as string[]],
   });
 
   constructor() {
@@ -193,6 +223,10 @@ export class SuppliersPortalPageComponent {
       currency: 'USD',
       autoApprovalUpTo: null,
       criticality: 'MEDIUM',
+      status: 'ACTIVE',
+      primarySectorCode: 'GENERAL',
+      esgComplianceScore: 75,
+      certifications: [] as string[],
     });
     this.dialogVisible.set(true);
   }
@@ -228,6 +262,13 @@ export class SuppliersPortalPageComponent {
             autoApprovalUpTo: s.thresholdPolicy.autoApprovalUpTo,
             criticality:
               s.strategicIntelligence?.criticalityIndex ?? 'MEDIUM',
+            status: s.complianceAndRisk?.status ?? 'ACTIVE',
+            primarySectorCode:
+              s.complianceAndRisk?.primarySectorCode ?? 'GENERAL',
+            esgComplianceScore: s.complianceAndRisk?.esgComplianceScore ?? 75,
+            certifications: s.complianceAndRisk?.certifications
+              ? [...s.complianceAndRisk.certifications]
+              : [],
           });
           this.dialogVisible.set(true);
         },
@@ -307,6 +348,25 @@ export class SuppliersPortalPageComponent {
         averageDisputeResolutionDays: 0,
         slaDeliveryComplianceRate: 1,
         trend: 'STABLE' as const,
+        onboardingStatus: 'PENDING_FIRST_INVOICE' as const,
+      },
+      complianceAndRisk: {
+        status: (v.status || 'ACTIVE') as
+          | 'ACTIVE'
+          | 'SUSPENDED'
+          | 'BLOCKED'
+          | 'INACTIVE',
+        lastAuditDate: new Date().toISOString(),
+        certifications: Array.isArray(v.certifications)
+          ? (v.certifications as string[])
+              .map((c) => String(c).trim())
+              .filter(Boolean)
+          : [],
+        esgComplianceScore: Math.max(
+          0,
+          Math.min(100, Number(v.esgComplianceScore ?? 0)),
+        ),
+        primarySectorCode: (v.primarySectorCode || 'GENERAL').trim(),
       },
     };
 
@@ -455,6 +515,76 @@ export class SuppliersPortalPageComponent {
       default:
         return 'Sin definir';
     }
+  }
+
+  protected statusLabel(s?: string): string {
+    switch (s) {
+      case 'ACTIVE':
+        return 'Activo';
+      case 'SUSPENDED':
+        return 'Suspendido';
+      case 'BLOCKED':
+        return 'Bloqueado';
+      case 'INACTIVE':
+        return 'Inactivo';
+      default:
+        return 'Sin estado';
+    }
+  }
+
+  protected statusSeverity(
+    s?: string,
+  ): 'success' | 'warning' | 'danger' | 'info' {
+    switch (s) {
+      case 'ACTIVE':
+        return 'success';
+      case 'SUSPENDED':
+        return 'warning';
+      case 'BLOCKED':
+        return 'danger';
+      case 'INACTIVE':
+        return 'info';
+      default:
+        return 'info';
+    }
+  }
+
+  protected onboardingLabel(s?: string): string {
+    switch (s) {
+      case 'PENDING_FIRST_INVOICE':
+        return 'Esperando primera factura';
+      case 'ACTIVE':
+        return 'Activo';
+      case 'OFFBOARDING':
+        return 'En offboarding';
+      case 'ARCHIVED':
+        return 'Archivado';
+      default:
+        return 'Sin definir';
+    }
+  }
+
+  protected onboardingSeverity(
+    s?: string,
+  ): 'success' | 'warning' | 'danger' | 'info' {
+    switch (s) {
+      case 'ACTIVE':
+        return 'success';
+      case 'PENDING_FIRST_INVOICE':
+        return 'info';
+      case 'OFFBOARDING':
+        return 'warning';
+      case 'ARCHIVED':
+        return 'danger';
+      default:
+        return 'info';
+    }
+  }
+
+  protected sectorLabel(code?: string): string {
+    if (!code) return 'Sin sector';
+    const opt = this.sectorOptions.find((o) => o.value === code);
+    return opt ? opt.label : code;
   }
 
   protected hasError(field: string, error: string): boolean {

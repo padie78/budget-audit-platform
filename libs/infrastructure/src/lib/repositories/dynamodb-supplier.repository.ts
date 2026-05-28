@@ -5,6 +5,7 @@ import {
   ScanCommand,
 } from '@aws-sdk/lib-dynamodb';
 import {
+  ComplianceAndRisk,
   DEFAULT_ENTITY_ID,
   Money,
   PaymentStrategy,
@@ -15,7 +16,9 @@ import {
   ThresholdPolicy,
   VendorPerformance,
   type ISupplierRepository,
+  type OnboardingStatus,
   type SupplierContactInfo,
+  type SupplierStatus,
 } from '@budget-audit/domain';
 import { DynamoKeys, EntityType, KeyPrefix } from '@budget-audit/common';
 import { SupplierMapper } from '@budget-audit/application';
@@ -89,9 +92,18 @@ interface SupplierItem {
     average_dispute_resolution_days: number;
     sla_delivery_compliance_rate: number;
     trend: 'IMPROVING' | 'STABLE' | 'DEGRADING';
+    onboarding_status: OnboardingStatus;
   };
 
   smart_thresholds?: SmartThresholdsItem;
+
+  compliance_and_risk?: {
+    status: SupplierStatus;
+    last_audit_date: string;
+    certifications: string[];
+    esg_compliance_score: number;
+    primary_sector_code: string;
+  };
 
   metadata: {
     created_at: string;
@@ -231,6 +243,8 @@ export class DynamoDbSupplierRepository implements ISupplierRepository {
             sla_delivery_compliance_rate:
               dto.vendorPerformance.slaDeliveryComplianceRate,
             trend: dto.vendorPerformance.trend,
+            onboarding_status:
+              dto.vendorPerformance.onboardingStatus ?? 'PENDING_FIRST_INVOICE',
           }
         : undefined,
 
@@ -245,6 +259,16 @@ export class DynamoDbSupplierRepository implements ISupplierRepository {
           absolute_tolerance: dto.thresholdPolicy.absoluteTolerance,
         },
       },
+
+      compliance_and_risk: dto.complianceAndRisk
+        ? {
+            status: dto.complianceAndRisk.status,
+            last_audit_date: dto.complianceAndRisk.lastAuditDate,
+            certifications: [...dto.complianceAndRisk.certifications],
+            esg_compliance_score: dto.complianceAndRisk.esgComplianceScore,
+            primary_sector_code: dto.complianceAndRisk.primarySectorCode,
+          }
+        : undefined,
 
       metadata: {
         created_at: dto.createdAt,
@@ -316,6 +340,9 @@ export class DynamoDbSupplierRepository implements ISupplierRepository {
             slaDeliveryComplianceRate:
               item.vendor_performance.sla_delivery_compliance_rate,
             trend: item.vendor_performance.trend,
+            onboardingStatus:
+              item.vendor_performance.onboarding_status ??
+              'PENDING_FIRST_INVOICE',
           })
         : undefined;
 
@@ -325,6 +352,17 @@ export class DynamoDbSupplierRepository implements ISupplierRepository {
           item.smart_thresholds.categories,
         )
       : undefined;
+
+    const complianceAndRisk: ComplianceAndRisk | undefined =
+      item.compliance_and_risk
+        ? ComplianceAndRisk.of({
+            status: item.compliance_and_risk.status,
+            lastAuditDate: new Date(item.compliance_and_risk.last_audit_date),
+            certifications: [...item.compliance_and_risk.certifications],
+            esgComplianceScore: item.compliance_and_risk.esg_compliance_score,
+            primarySectorCode: item.compliance_and_risk.primary_sector_code,
+          })
+        : undefined;
 
     return Supplier.create({
       tenantId: item.tenant_id,
@@ -342,6 +380,7 @@ export class DynamoDbSupplierRepository implements ISupplierRepository {
       strategicIntelligence,
       vendorPerformance,
       smartThresholds,
+      complianceAndRisk,
     });
   }
 }

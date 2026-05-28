@@ -5,6 +5,13 @@
 
 export type VendorTrend = 'IMPROVING' | 'STABLE' | 'DEGRADING';
 
+/** Etapa del ciclo de vida operacional del proveedor en la plataforma. */
+export type OnboardingStatus =
+  | 'PENDING_FIRST_INVOICE'
+  | 'ACTIVE'
+  | 'OFFBOARDING'
+  | 'ARCHIVED';
+
 export interface VendorPerformanceProps {
   /** 0..1, % de docs auditados sin disputa. */
   reliabilityScore: number;
@@ -14,6 +21,11 @@ export interface VendorPerformanceProps {
   /** 0..1, % de entregas a tiempo según SLA. */
   slaDeliveryComplianceRate: number;
   trend: VendorTrend;
+  /**
+   * Onboarding lifecycle. Default `PENDING_FIRST_INVOICE` para suppliers
+   * recién creados; pasa a `ACTIVE` con la primera auditoría exitosa.
+   */
+  onboardingStatus?: OnboardingStatus;
 }
 
 export class VendorPerformance {
@@ -36,7 +48,10 @@ export class VendorPerformance {
     if (props.totalAuditedDocs < 0 || props.totalDisputesRaised < 0) {
       throw new Error('Conteos negativos no son válidos en VendorPerformance.');
     }
-    return new VendorPerformance(props);
+    return new VendorPerformance({
+      ...props,
+      onboardingStatus: props.onboardingStatus ?? 'PENDING_FIRST_INVOICE',
+    });
   }
 
   get reliabilityScore(): number { return this.props.reliabilityScore; }
@@ -49,6 +64,9 @@ export class VendorPerformance {
     return this.props.slaDeliveryComplianceRate;
   }
   get trend(): VendorTrend { return this.props.trend; }
+  get onboardingStatus(): OnboardingStatus {
+    return this.props.onboardingStatus ?? 'PENDING_FIRST_INVOICE';
+  }
 
   /** Ratio disputas/auditados — útil para alertar al sourcing. */
   get disputeRate(): number {

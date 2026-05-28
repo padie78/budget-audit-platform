@@ -30,6 +30,7 @@ export * from './lib/value-objects/dispute-workflow';
 export * from './lib/value-objects/strategic-intelligence';
 export * from './lib/value-objects/vendor-performance';
 export * from './lib/value-objects/smart-thresholds';
+export * from './lib/value-objects/compliance-and-risk';
 
 // Value Objects — Contract enterprise
 export * from './lib/value-objects/financial-limits';

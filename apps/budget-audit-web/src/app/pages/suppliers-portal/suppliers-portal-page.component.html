@@ -149,6 +149,9 @@
             </div>
           </th>
           <th style="min-width: 120px">Riesgo</th>
+          <th style="min-width: 130px">Estado</th>
+          <th style="min-width: 140px">Onboarding</th>
+          <th style="min-width: 130px">Sector</th>
           <th style="min-width: 120px">Trend</th>
           <th style="min-width: 130px">Criticidad</th>
           <th style="width: 110px; text-align: right">Acciones</th>
@@ -221,6 +224,29 @@
           </td>
 
           <td>
+            <p-tag
+              [value]="statusLabel(row.status)"
+              [severity]="statusSeverity(row.status)"
+              [rounded]="true"
+            ></p-tag>
+          </td>
+
+          <td>
+            <p-tag
+              [value]="onboardingLabel(row.onboardingStatus)"
+              [severity]="onboardingSeverity(row.onboardingStatus)"
+              [rounded]="true"
+            ></p-tag>
+          </td>
+
+          <td>
+            <span class="cell-sector">
+              <i class="pi pi-tag"></i>
+              {{ sectorLabel(row.primarySectorCode) }}
+            </span>
+          </td>
+
+          <td>
             <span class="cell-trend">
               <i
                 class="pi"
@@ -268,7 +294,7 @@
 
       <ng-template pTemplate="emptymessage">
         <tr>
-          <td colspan="8" class="empty">
+          <td colspan="11" class="empty">
             <div class="empty__inner">
               <div class="empty__illustration">
                 <i class="pi pi-inbox"></i>
@@ -488,6 +514,70 @@
               optionValue="value"
               appendTo="body"
             ></p-dropdown>
+          </label>
+        </div>
+      </fieldset>
+
+      <!-- Compliance & ESG -->
+      <fieldset class="form__section">
+        <legend>
+          <i class="pi pi-shield"></i> Compliance & ESG
+        </legend>
+
+        <div class="form__row">
+          <label class="form__field">
+            <span class="form__label">Estado regulatorio <em>*</em></span>
+            <p-dropdown
+              [options]="statusOptions"
+              formControlName="status"
+              optionLabel="label"
+              optionValue="value"
+              appendTo="body"
+            ></p-dropdown>
+            <small class="form__hint">
+              Suspendido / Bloqueado deshabilita nuevas auditorías para este proveedor.
+            </small>
+          </label>
+
+          <label class="form__field">
+            <span class="form__label">Sector principal <em>*</em></span>
+            <p-dropdown
+              [options]="sectorOptions"
+              formControlName="primarySectorCode"
+              optionLabel="label"
+              optionValue="value"
+              appendTo="body"
+            ></p-dropdown>
+          </label>
+        </div>
+
+        <div class="form__row">
+          <label class="form__field">
+            <span class="form__label">ESG Compliance Score (0–100)</span>
+            <p-inputNumber
+              formControlName="esgComplianceScore"
+              [min]="0"
+              [max]="100"
+              [step]="5"
+              [showButtons]="true"
+              suffix=" pts"
+            ></p-inputNumber>
+            <small class="form__hint">
+              Score compuesto: ambiental + social + governance.
+            </small>
+          </label>
+
+          <label class="form__field">
+            <span class="form__label">Certificaciones</span>
+            <p-chips
+              formControlName="certifications"
+              placeholder="Ej: ISO-9001, SOC2, ISO-14001"
+              [addOnBlur]="true"
+              [allowDuplicate]="false"
+            ></p-chips>
+            <small class="form__hint">
+              Presioná Enter para agregar cada certificación.
+            </small>
           </label>
         </div>
       </fieldset>

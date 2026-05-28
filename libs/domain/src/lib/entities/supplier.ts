@@ -2,6 +2,7 @@ import { ThresholdPolicy } from '../value-objects/threshold-policy';
 import { StrategicIntelligence } from '../value-objects/strategic-intelligence';
 import { VendorPerformance } from '../value-objects/vendor-performance';
 import { SmartThresholds } from '../value-objects/smart-thresholds';
+import { ComplianceAndRisk } from '../value-objects/compliance-and-risk';
 
 /* =============================================================================
  * Supplier — aggregate root del proveedor.
@@ -45,6 +46,7 @@ export interface SupplierProps {
   strategicIntelligence?: StrategicIntelligence;
   vendorPerformance?: VendorPerformance;
   smartThresholds?: SmartThresholds;
+  complianceAndRisk?: ComplianceAndRisk;
 }
 
 export const DEFAULT_ENTITY_ID = 'GLOBAL';
@@ -94,6 +96,9 @@ export class Supplier {
   }
   get smartThresholds(): SmartThresholds | undefined {
     return this.props.smartThresholds;
+  }
+  get complianceAndRisk(): ComplianceAndRisk | undefined {
+    return this.props.complianceAndRisk;
   }
 
   /**

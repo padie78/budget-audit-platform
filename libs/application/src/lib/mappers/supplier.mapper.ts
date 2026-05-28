@@ -1,11 +1,13 @@
 import {
   Supplier,
+  type ComplianceAndRisk,
   type StrategicIntelligence,
   type VendorPerformance,
   type SmartThresholds,
   type SupplierContactInfo,
 } from '@budget-audit/domain';
 import type {
+  ComplianceAndRiskDto,
   StrategicIntelligenceDto,
   SupplierContactInfoDto,
   SupplierDto,
@@ -55,6 +57,9 @@ export class SupplierMapper {
       smartThresholds: snap.smartThresholds
         ? SupplierMapper.smartThresholdsToDto(snap.smartThresholds)
         : undefined,
+      complianceAndRisk: snap.complianceAndRisk
+        ? SupplierMapper.complianceAndRiskToDto(snap.complianceAndRisk)
+        : undefined,
     };
   }
 
@@ -90,6 +95,19 @@ export class SupplierMapper {
       averageDisputeResolutionDays: v.averageDisputeResolutionDays,
       slaDeliveryComplianceRate: v.slaDeliveryComplianceRate,
       trend: v.trend,
+      onboardingStatus: v.onboardingStatus,
+    };
+  }
+
+  private static complianceAndRiskToDto(
+    c: ComplianceAndRisk,
+  ): ComplianceAndRiskDto {
+    return {
+      status: c.status,
+      lastAuditDate: c.lastAuditDate.toISOString(),
+      certifications: [...c.certifications],
+      esgComplianceScore: c.esgComplianceScore,
+      primarySectorCode: c.primarySectorCode,
     };
   }
 
