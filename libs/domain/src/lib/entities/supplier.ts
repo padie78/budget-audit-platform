@@ -1,15 +1,41 @@
 import { ThresholdPolicy } from '../value-objects/threshold-policy';
+import { StrategicIntelligence } from '../value-objects/strategic-intelligence';
+import { VendorPerformance } from '../value-objects/vendor-performance';
+import { SmartThresholds } from '../value-objects/smart-thresholds';
+
+/* =============================================================================
+ * Supplier — aggregate root del proveedor.
+ *
+ * El shape "core" (id, name, taxId, contactEmail, fidelityScore,
+ * thresholdPolicy) se mantiene estable para no romper consumidores legacy.
+ *
+ * Los bloques enterprise del design (strategicIntelligence, vendorPerformance,
+ * smartThresholds, contactInfo) son OPCIONALES: una entidad con solo el core
+ * sigue siendo válida — el repo los hidrata si están presentes en DynamoDB.
+ * ============================================================================= */
+
+export interface SupplierContactInfo {
+  email: string;
+  phone?: string;
+  address?: string;
+}
 
 export interface SupplierProps {
   id: string;
   name: string;
   taxId: string;
   contactEmail: string;
-  /** 0..100 — score interno de fidelidad/cumplimiento del proveedor. */
+  /** 0..100 — score interno legacy de fidelidad/cumplimiento del proveedor. */
   fidelityScore: number;
   thresholdPolicy: ThresholdPolicy;
   createdAt: Date;
   updatedAt: Date;
+
+  // ─────────── Extensiones enterprise (opcionales) ───────────
+  contactInfo?: SupplierContactInfo;
+  strategicIntelligence?: StrategicIntelligence;
+  vendorPerformance?: VendorPerformance;
+  smartThresholds?: SmartThresholds;
 }
 
 export class Supplier {
@@ -18,6 +44,11 @@ export class Supplier {
   static create(props: SupplierProps): Supplier {
     if (!props.name.trim()) {
       throw new Error('El nombre del proveedor es obligatorio.');
+    }
+    if (props.fidelityScore < 0 || props.fidelityScore > 100) {
+      throw new Error(
+        `fidelityScore fuera de rango 0..100: ${props.fidelityScore}`,
+      );
     }
     return new Supplier(props);
   }
@@ -30,6 +61,30 @@ export class Supplier {
   get thresholdPolicy(): ThresholdPolicy { return this.props.thresholdPolicy; }
   get createdAt(): Date { return this.props.createdAt; }
   get updatedAt(): Date { return this.props.updatedAt; }
+
+  get contactInfo(): SupplierContactInfo | undefined {
+    return this.props.contactInfo;
+  }
+  get strategicIntelligence(): StrategicIntelligence | undefined {
+    return this.props.strategicIntelligence;
+  }
+  get vendorPerformance(): VendorPerformance | undefined {
+    return this.props.vendorPerformance;
+  }
+  get smartThresholds(): SmartThresholds | undefined {
+    return this.props.smartThresholds;
+  }
+
+  /**
+   * Devuelve la tolerancia % para una categoría dada, usando primero
+   * `smartThresholds` (si existe) y cayendo a `thresholdPolicy.percent`.
+   */
+  toleranceForCategory(category: string | null | undefined): number {
+    if (this.props.smartThresholds) {
+      return this.props.smartThresholds.toleranceFor(category);
+    }
+    return this.props.thresholdPolicy.percent;
+  }
 
   toJSON(): SupplierProps {
     return { ...this.props };

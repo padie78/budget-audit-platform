@@ -1,0 +1,111 @@
+<aside
+  class="flex flex-col w-72 h-screen bg-slate-950 text-slate-200 border-r border-slate-800/80 select-none"
+>
+  <!-- ─────────── Branding ─────────── -->
+  <header class="px-5 py-5 border-b border-slate-800/80">
+    <div class="flex items-center gap-3">
+      <div
+        class="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-700 flex items-center justify-center shadow-lg shadow-indigo-900/40"
+      >
+        <i class="pi pi-verified text-white text-lg"></i>
+      </div>
+      <div class="leading-tight">
+        <h1 class="text-base font-semibold text-white tracking-tight">
+          ProcureTech OS
+        </h1>
+        <p class="text-[11px] uppercase tracking-[0.14em] text-slate-400">
+          Enterprise Audit Suite
+        </p>
+      </div>
+    </div>
+  </header>
+
+  <!-- ─────────── Navegación (PrimeNG p-panelMenu) ─────────── -->
+  <nav class="flex-1 overflow-y-auto px-3 py-4">
+    <p-panelMenu
+      [model]="items()"
+      [multiple]="true"
+      styleClass="procuretech-panelmenu"
+    >
+      <ng-template pTemplate="item" let-item>
+        @if (item.items?.length) {
+          <!-- ───── CATEGORÍA (header) ───── -->
+          <div
+            class="group flex items-center gap-3 px-2 py-2.5 rounded-lg cursor-pointer hover:bg-slate-800/50 transition-colors duration-150"
+          >
+            <span
+              class="w-7 h-7 rounded-md bg-indigo-500/10 ring-1 ring-indigo-500/25 flex items-center justify-center group-hover:bg-indigo-500/20 group-hover:ring-indigo-400/40 transition-colors"
+            >
+              <i
+                *ngIf="item.icon"
+                [class]="item.icon + ' text-[12px] text-indigo-300 group-hover:text-indigo-200'"
+              ></i>
+            </span>
+
+            <span
+              class="flex-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-300 group-hover:text-white truncate"
+            >
+              {{ item.label }}
+            </span>
+
+            <i
+              class="pi pi-chevron-down text-[10px] text-slate-500 group-hover:text-slate-300 transition-transform duration-200"
+              [class.rotate-180]="item.expanded"
+            ></i>
+          </div>
+        } @else {
+          <!-- ───── ITEM HIJO ───── -->
+          <a
+            class="group flex items-center gap-3 pl-3 pr-2.5 py-1.5 rounded-md cursor-pointer text-[13px] text-slate-400 hover:bg-slate-800/70 hover:text-white transition-colors duration-150"
+          >
+            <i
+              *ngIf="item.icon"
+              [class]="item.icon + ' text-[13px] text-slate-500 group-hover:text-indigo-300'"
+            ></i>
+
+            <span class="flex-1 truncate font-medium">{{ item.label }}</span>
+
+            <p-badge
+              *ngIf="item.badge"
+              [value]="item.badge"
+              [styleClass]="item.badgeStyleClass || 'badge-default'"
+            ></p-badge>
+          </a>
+        }
+      </ng-template>
+    </p-panelMenu>
+  </nav>
+
+  <!-- ─────────── Perfil del usuario ─────────── -->
+  <footer class="px-3 py-3 border-t border-slate-800/80">
+    <div
+      class="flex items-center gap-3 p-2.5 rounded-xl bg-slate-900/80 hover:bg-slate-800/70 transition-colors duration-150 cursor-pointer ring-1 ring-slate-800/60"
+    >
+      <div
+        class="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-fuchsia-600 flex items-center justify-center text-white text-xs font-semibold shadow-md shadow-indigo-900/40"
+        aria-hidden="true"
+      >
+        {{ initials() }}
+      </div>
+      <div class="flex-1 min-w-0 leading-tight">
+        <p class="text-[13px] font-medium text-white truncate">
+          {{ userName() }}
+        </p>
+        <p class="text-[11px] text-slate-400 flex items-center gap-1">
+          <i class="pi pi-shield text-[10px] text-emerald-400"></i>
+          {{ userRole() }}
+        </p>
+      </div>
+      <button
+        type="button"
+        class="text-slate-400 hover:text-white p-1 rounded transition-colors"
+        aria-label="Opciones de cuenta"
+      >
+        <i class="pi pi-ellipsis-v text-[12px]"></i>
+      </button>
+    </div>
+    <p class="text-[10px] text-slate-600 text-center mt-2">
+      v1.0.0 · build 2026.05
+    </p>
+  </footer>
+</aside>

@@ -1,0 +1,171 @@
+/* =========================================================================
+ *  <app-sidebar> — ProcureTech OS
+ *
+ *  Filosofía: TODO el estilo visual (colores, hover, jerarquía) vive en el
+ *  HTML mediante clases Tailwind. El rol de este SCSS es ÚNICAMENTE
+ *  neutralizar los wrappers de PrimeNG (lara-light) para que no inyecten
+ *  fondos blancos, bordes ni padding por encima de nuestro template.
+ *
+ *  Estructura DOM real de PrimeNG 17:
+ *
+ *    <div class="p-panelmenu-header">
+ *      <div class="p-panelmenu-header-content">
+ *        <a class="p-panelmenu-header-action"> ng-template item ... </a>
+ *      </div>
+ *    </div>
+ *    <div class="p-panelmenu-content">
+ *      <ul>
+ *        <li class="p-menuitem">
+ *          <div class="p-menuitem-content">
+ *            <a class="p-menuitem-link"> ng-template item ... </a>
+ *          </div>
+ *        </li>
+ *      </ul>
+ *    </div>
+ * ========================================================================= */
+:host {
+  display: block;
+}
+
+::ng-deep .procuretech-panelmenu {
+  background: transparent !important;
+  border: none !important;
+  padding: 0;
+  font-family: inherit;
+
+  /* Aniquilar fondos / bordes / shadows de TODOS los wrappers */
+  .p-panelmenu-panel,
+  .p-panelmenu-header,
+  .p-panelmenu-header-content,
+  .p-panelmenu-content,
+  .p-menuitem,
+  .p-menuitem-content,
+  .p-menuitem-content:hover {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  .p-panelmenu-panel {
+    margin-bottom: 0.15rem;
+  }
+
+  /* El link de header (PrimeNG mete su propio <a> alrededor de NUESTRO div
+     del pTemplate). Lo dejamos como un contenedor neutro: sin padding, sin
+     borde, sin hover propio — el hover real lo pinta el <div> interno. */
+  .p-panelmenu-header-action,
+  .p-panelmenu-header-link,
+  a.p-panelmenu-header-action,
+  .p-panelmenu-header-action:link,
+  .p-panelmenu-header-action:visited,
+  .p-panelmenu-header-action:hover,
+  .p-panelmenu-header-action:focus,
+  .p-panelmenu-header-action:active {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    outline: none !important;
+    padding: 0 !important;
+    color: inherit !important;
+    text-decoration: none !important;
+  }
+
+  /* Mismo trato para el link de item hijo */
+  .p-menuitem-link,
+  .p-menuitem-link:link,
+  .p-menuitem-link:visited,
+  .p-menuitem-link:hover,
+  .p-menuitem-link:focus,
+  .p-menuitem-link:active,
+  .p-menuitem-link.p-menuitem-link-active,
+  a.p-menuitem-link {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    outline: none !important;
+    padding: 0 !important;
+    color: inherit !important;
+    text-decoration: none !important;
+  }
+
+  /* Ocultar iconos/textos default de PrimeNG (los pintamos en nuestro template) */
+  .p-panelmenu-header-action > .p-menuitem-icon,
+  .p-panelmenu-header-action > .p-menuitem-text,
+  .p-panelmenu-header-action > .p-submenu-icon,
+  .p-panelmenu-header-action > .p-panelmenu-icon,
+  .p-menuitem-link > .p-menuitem-text,
+  .p-menuitem-link > .p-menuitem-icon,
+  .p-menuitem-link > .p-submenu-icon {
+    display: none !important;
+  }
+
+  /* Contenedor del submenu: línea decorativa estilo árbol */
+  .p-panelmenu-content {
+    padding: 0.2rem 0 0.5rem 0.65rem;
+    position: relative;
+
+    &::before {
+      content: '';
+      position: absolute;
+      top: 0.2rem;
+      bottom: 0.5rem;
+      left: 1.1rem;
+      width: 1px;
+      background: rgba(51, 65, 85, 0.55); /* slate-700/55 */
+    }
+
+    ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+  }
+
+  /* ─────────── Badges (consumidos por badgeStyleClass del MenuItem) ─────────── */
+  .badge-default .p-badge,
+  .p-badge-default .p-badge {
+    background: rgb(71 85 105);
+    color: white;
+  }
+  .badge-danger .p-badge,
+  .p-badge-danger .p-badge {
+    background: rgb(220 38 38);
+    color: white;
+    box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.18);
+  }
+  .badge-warning .p-badge,
+  .p-badge-warning .p-badge {
+    background: rgb(202 138 4);
+    color: rgb(15 23 42);
+  }
+  .badge-success .p-badge,
+  .p-badge-success .p-badge {
+    background: rgb(22 163 74);
+    color: white;
+  }
+
+  .p-badge {
+    font-size: 0.65rem;
+    height: 1.05rem;
+    min-width: 1.05rem;
+    line-height: 1.05rem;
+    padding: 0 0.4rem;
+    border-radius: 999px;
+    font-weight: 600;
+  }
+}
+
+/* Scrollbar discreta dentro del <nav> */
+::ng-deep nav::-webkit-scrollbar {
+  width: 6px;
+}
+::ng-deep nav::-webkit-scrollbar-thumb {
+  background: rgba(71, 85, 105, 0.55);
+  border-radius: 3px;
+}
+::ng-deep nav::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.75);
+}

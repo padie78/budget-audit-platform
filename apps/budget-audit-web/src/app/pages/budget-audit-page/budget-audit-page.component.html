@@ -1,51 +1,16 @@
 <div class="layout">
-  <aside class="layout__sidebar">
-    <div class="brand">
-      <span class="brand__mark">B</span>
-      <div>
-        <strong>BudgetAudit</strong>
-        <small>B2B AI</small>
-      </div>
-    </div>
-
-    <nav class="nav" aria-label="Principal">
-      @for (item of navItems; track item.id) {
-        <a
-          class="nav__item"
-          [class.nav__item--active]="item.active"
-          [attr.aria-current]="item.active ? 'page' : null"
-          href="#"
-        >
-          <span class="nav__icon" aria-hidden="true">{{ item.icon }}</span>
-          <span>{{ item.label }}</span>
-        </a>
-      }
-    </nav>
-
-    <footer class="layout__sidebar-footer">
-      <small>v1.0.0 · MVP</small>
-    </footer>
-  </aside>
+  <app-sidebar
+    [pendingAuditsCount]="pendingAuditsCount()"
+    [legalRisksCount]="legalRisksCount()"
+    userName="Diego Villarreal"
+    userRole="Administrador"
+  ></app-sidebar>
 
   <div class="layout__main">
-    <header class="topbar">
-      <div>
-        <h1>Auditor de presupuestos</h1>
-        <small>Compara cotizaciones contra el contrato base con IA.</small>
-      </div>
-      <div class="topbar__actions">
-        <button type="button" class="topbar__btn topbar__btn--ghost">
-          Documentación
-        </button>
-        <div class="topbar__user" aria-label="Usuario actual">
-          <span class="topbar__avatar" aria-hidden="true">DV</span>
-          <div>
-            <strong>Diego V.</strong>
-            <small>Procurement Lead</small>
-          </div>
-        </div>
-      </div>
-    </header>
+    <app-topbar
+      userName="Diego L."
+      userRole="Admin Global"
+    ></app-topbar>
 
     <section class="content">
       <app-budget-auditor-workspace></app-budget-auditor-workspace>

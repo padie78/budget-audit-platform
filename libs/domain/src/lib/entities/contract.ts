@@ -1,4 +1,24 @@
 import { Money } from '../value-objects/money';
+import { FinancialLimits } from '../value-objects/financial-limits';
+import { LegalBaseline } from '../value-objects/legal-baseline';
+import { PredictiveEngine } from '../value-objects/predictive-engine';
+import { SustainabilityEsg } from '../value-objects/sustainability-esg';
+
+/* =============================================================================
+ * Contract — aggregate root del contrato marco (price-book + cupos).
+ *
+ * Mantiene el core (id, supplierId, vigencia, currency, agreedItems) estable
+ * para no romper consumidores legacy. Los bloques enterprise del design
+ * (financialLimits, legalBaseline, predictiveEngine, sustainabilityEsg) son
+ * OPCIONALES.
+ * ============================================================================= */
+
+export type ContractStatus =
+  | 'DRAFT'
+  | 'ACTIVE'
+  | 'EXPIRED'
+  | 'TERMINATED'
+  | 'PENDING_REVIEW';
 
 export interface AgreedItem {
   sku: string;
@@ -6,6 +26,18 @@ export interface AgreedItem {
   unit: string;
   agreedUnitPrice: Money;
   tolerancePercent: number;
+
+  // ─────────── Extensiones price-book (opcionales) ───────────
+  category?: string;
+  lastPriceUpdate?: Date;
+}
+
+export interface ContractMetadata {
+  s3SignedContractPdf?: string;
+  uploadedBy?: string;
+  timestamp?: Date;
+  lastAmendmentDate?: Date;
+  amendmentLog?: string;
 }
 
 export interface ContractProps {
@@ -17,6 +49,15 @@ export interface ContractProps {
   agreedItems: Map<string, AgreedItem>;
   createdAt: Date;
   updatedAt: Date;
+
+  // ─────────── Extensiones enterprise (opcionales) ───────────
+  contractName?: string;
+  status?: ContractStatus;
+  financialLimits?: FinancialLimits;
+  legalBaseline?: LegalBaseline;
+  predictiveEngine?: PredictiveEngine;
+  sustainabilityEsg?: SustainabilityEsg;
+  metadata?: ContractMetadata;
 }
 
 export class Contract {
@@ -29,21 +70,28 @@ export class Contract {
     return new Contract(props);
   }
 
-  get id(): string {
-    return this.props.id;
+  get id(): string { return this.props.id; }
+  get supplierId(): string { return this.props.supplierId; }
+  get currency(): string { return this.props.currency; }
+  get effectiveFrom(): Date { return this.props.effectiveFrom; }
+  get effectiveTo(): Date | null { return this.props.effectiveTo; }
+  get agreedItems(): ReadonlyMap<string, AgreedItem> { return this.props.agreedItems; }
+  get createdAt(): Date { return this.props.createdAt; }
+  get updatedAt(): Date { return this.props.updatedAt; }
+
+  get contractName(): string | undefined { return this.props.contractName; }
+  get status(): ContractStatus | undefined { return this.props.status; }
+  get financialLimits(): FinancialLimits | undefined {
+    return this.props.financialLimits;
   }
-  get supplierId(): string {
-    return this.props.supplierId;
+  get legalBaseline(): LegalBaseline | undefined { return this.props.legalBaseline; }
+  get predictiveEngine(): PredictiveEngine | undefined {
+    return this.props.predictiveEngine;
   }
-  get currency(): string {
-    return this.props.currency;
+  get sustainabilityEsg(): SustainabilityEsg | undefined {
+    return this.props.sustainabilityEsg;
   }
-  get effectiveFrom(): Date {
-    return this.props.effectiveFrom;
-  }
-  get effectiveTo(): Date | null {
-    return this.props.effectiveTo;
-  }
+  get metadata(): ContractMetadata | undefined { return this.props.metadata; }
 
   isActiveAt(date: Date): boolean {
     if (date < this.props.effectiveFrom) return false;
@@ -55,7 +103,10 @@ export class Contract {
     return this.props.agreedItems.get(sku);
   }
 
-  get agreedItems(): ReadonlyMap<string, AgreedItem> {
-    return this.props.agreedItems;
+  toJSON(): ContractProps {
+    return {
+      ...this.props,
+      agreedItems: new Map(this.props.agreedItems),
+    };
   }
 }

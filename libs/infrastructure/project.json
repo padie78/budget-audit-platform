@@ -10,7 +10,9 @@
       "options": {
         "outputPath": "dist/libs/infrastructure",
         "main": "libs/infrastructure/src/index.ts",
-        "tsConfig": "libs/infrastructure/tsconfig.lib.json"
+        "rootDir": ".",
+        "tsConfig": "libs/infrastructure/tsconfig.lib.json",
+        "buildLibsFromSource": false
       }
     }
   },

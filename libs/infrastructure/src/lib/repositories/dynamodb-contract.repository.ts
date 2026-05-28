@@ -1,12 +1,36 @@
 import { GetCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
 import {
   Contract,
+  FinancialLimits,
+  LegalBaseline,
   Money,
+  PredictiveEngine,
+  SustainabilityEsg,
   type AgreedItem,
+  type ContractMetadata,
+  type ContractStatus,
   type IContractRepository,
 } from '@budget-audit/domain';
-import { DynamoKeys, EntityType, KeyPrefix } from '@budget-audit/common';
+import {
+  DynamoKeys,
+  EntityType,
+  KeyPrefix,
+  type AgreedItemDto,
+  type ContractDto,
+  type FinancialLimitsDto,
+  type LegalBaselineDto,
+  type PredictiveEngineDto,
+  type SustainabilityEsgDto,
+} from '@budget-audit/common';
 import { getDocumentClient } from '../aws/dynamodb-client.factory';
+
+/* =============================================================================
+ * DynamoDbContractRepository — adapter del puerto IContractRepository.
+ *
+ * Hydrata el aggregate root completo (price-book + bloques enterprise).
+ * Los bloques nuevos (financialLimits, legalBaseline, predictiveEngine,
+ * sustainabilityEsg, metadata) son opcionales.
+ * ============================================================================= */
 
 interface ContractItem {
   PK: string;
@@ -17,19 +41,24 @@ interface ContractItem {
   effectiveFrom: string;
   effectiveTo: string | null;
   currency: string;
-  /** Mapa SKU → AgreedItem serializado. */
-  agreedItems: Record<
-    string,
-    {
-      sku: string;
-      description: string;
-      unit: string;
-      agreedUnitPrice: number;
-      tolerancePercent?: number;
-    }
-  >;
+  agreedItems: Record<string, AgreedItemDto>;
   createdAt: string;
   updatedAt: string;
+
+  // ─────────── Bloques enterprise (opcionales) ───────────
+  contractName?: string;
+  status?: ContractDto['status'];
+  financialLimits?: FinancialLimitsDto;
+  legalBaseline?: LegalBaselineDto;
+  predictiveEngine?: PredictiveEngineDto;
+  sustainabilityEsg?: SustainabilityEsgDto;
+  metadata?: {
+    s3SignedContractPdf?: string;
+    uploadedBy?: string;
+    timestamp?: string;
+    lastAmendmentDate?: string;
+    amendmentLog?: string;
+  };
 }
 
 export class DynamoDbContractRepository implements IContractRepository {
@@ -56,10 +85,6 @@ export class DynamoDbContractRepository implements IContractRepository {
     return this.toEntity(res.Item as ContractItem);
   }
 
-  /**
-   * Busca el contrato vigente más reciente para un proveedor. Se hace un
-   * Query con begins_with sobre la SK y se filtra en memoria por vigencia.
-   */
   async findActiveBySupplier(
     supplierId: string,
     at: Date = new Date(),
@@ -95,8 +120,86 @@ export class DynamoDbContractRepository implements IContractRepository {
         unit: raw.unit,
         agreedUnitPrice: Money.from(raw.agreedUnitPrice, item.currency),
         tolerancePercent: raw.tolerancePercent ?? 0,
+        category: raw.category,
+        lastPriceUpdate: raw.lastPriceUpdate
+          ? new Date(raw.lastPriceUpdate)
+          : undefined,
       });
     }
+
+    const financialLimits: FinancialLimits | undefined = item.financialLimits
+      ? FinancialLimits.of({
+          totalBudgetLimit: Money.from(
+            item.financialLimits.totalBudgetLimit,
+            item.currency,
+          ),
+          currentBurnRate: Money.from(
+            item.financialLimits.currentBurnRateUsd,
+            item.currency,
+          ),
+          allocatedOpexQuota: Money.from(
+            item.financialLimits.allocatedOpexQuota,
+            item.currency,
+          ),
+          allocatedCapexQuota: Money.from(
+            item.financialLimits.allocatedCapexQuota,
+            item.currency,
+          ),
+        })
+      : undefined;
+
+    const legalBaseline: LegalBaseline | undefined = item.legalBaseline
+      ? LegalBaseline.of({
+          paymentTermsDays: item.legalBaseline.paymentTermsDays,
+          earlyPaymentDiscountPercentage:
+            item.legalBaseline.earlyPaymentDiscountPercentage,
+          earlyPaymentWindowDays: item.legalBaseline.earlyPaymentWindowDays,
+          jurisdiction: item.legalBaseline.jurisdiction,
+          penaltyPerDelayDayPercentage:
+            item.legalBaseline.penaltyPerDelayDayPercentage,
+          governanceComplianceScore:
+            item.legalBaseline.governanceComplianceScore,
+        })
+      : undefined;
+
+    const predictiveEngine: PredictiveEngine | undefined = item.predictiveEngine
+      ? PredictiveEngine.of({
+          estimatedDepletionDate: new Date(
+            item.predictiveEngine.estimatedDepletionDate,
+          ),
+          burnRateSeverity: item.predictiveEngine.burnRateSeverity,
+          inflationAdjustmentAlert: item.predictiveEngine.inflationAdjustmentAlert
+            ? new Date(item.predictiveEngine.inflationAdjustmentAlert)
+            : null,
+          p90WorstCaseSpend: Money.from(
+            item.predictiveEngine.p90WorstCaseSpendUsd,
+            item.currency,
+          ),
+          contractDriftRisk: item.predictiveEngine.contractDriftRisk,
+        })
+      : undefined;
+
+    const sustainabilityEsg: SustainabilityEsg | undefined = item.sustainabilityEsg
+      ? SustainabilityEsg.of({
+          carbonBudgetCo2eKg: item.sustainabilityEsg.carbonBudgetCo2eKg,
+          currentUsageCo2eKg: item.sustainabilityEsg.currentUsageCo2eKg,
+          complianceStatus: item.sustainabilityEsg.complianceStatus,
+        })
+      : undefined;
+
+    const metadata: ContractMetadata | undefined = item.metadata
+      ? {
+          s3SignedContractPdf: item.metadata.s3SignedContractPdf,
+          uploadedBy: item.metadata.uploadedBy,
+          timestamp: item.metadata.timestamp
+            ? new Date(item.metadata.timestamp)
+            : undefined,
+          lastAmendmentDate: item.metadata.lastAmendmentDate
+            ? new Date(item.metadata.lastAmendmentDate)
+            : undefined,
+          amendmentLog: item.metadata.amendmentLog,
+        }
+      : undefined;
 
     return Contract.create({
       id: item.id,
@@ -107,6 +210,14 @@ export class DynamoDbContractRepository implements IContractRepository {
       agreedItems: agreedMap,
       createdAt: new Date(item.createdAt),
       updatedAt: new Date(item.updatedAt),
+
+      contractName: item.contractName,
+      status: item.status as ContractStatus | undefined,
+      financialLimits,
+      legalBaseline,
+      predictiveEngine,
+      sustainabilityEsg,
+      metadata,
     });
   }
 }

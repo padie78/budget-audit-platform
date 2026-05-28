@@ -1,5 +1,7 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
 import { BudgetAuditorWorkspaceComponent } from '../../features/budget-auditor-workspace/budget-auditor-workspace.component';
+import { SidebarComponent } from '../../ui/organisms/sidebar/sidebar.component';
+import { TopbarComponent } from '../../ui/organisms/topbar/topbar.component';
 
 /**
  * PAGE — Layout estructural de la aplicación (Sidebar + Topbar + Content).
@@ -9,15 +11,11 @@ import { BudgetAuditorWorkspaceComponent } from '../../features/budget-auditor-w
   selector: 'app-budget-audit-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [BudgetAuditorWorkspaceComponent],
+  imports: [SidebarComponent, TopbarComponent, BudgetAuditorWorkspaceComponent],
   templateUrl: './budget-audit-page.component.html',
   styleUrl: './budget-audit-page.component.scss',
 })
 export class BudgetAuditPageComponent {
-  protected readonly navItems = [
-    { id: 'audit', label: 'Auditorías', icon: '◎', active: true },
-    { id: 'suppliers', label: 'Proveedores', icon: '☷', active: false },
-    { id: 'contracts', label: 'Contratos', icon: '⎈', active: false },
-    { id: 'reports', label: 'Reportes', icon: '↗', active: false },
-  ];
+  protected readonly pendingAuditsCount = signal(7);
+  protected readonly legalRisksCount = signal(3);
 }

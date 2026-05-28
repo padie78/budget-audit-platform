@@ -10,7 +10,9 @@
       "options": {
         "outputPath": "dist/libs/application",
         "main": "libs/application/src/index.ts",
-        "tsConfig": "libs/application/tsconfig.lib.json"
+        "rootDir": ".",
+        "tsConfig": "libs/application/tsconfig.lib.json",
+        "buildLibsFromSource": false
       }
     }
   },

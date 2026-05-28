@@ -1,9 +1,7 @@
 import { Money } from '../value-objects/money';
 import { AlertSeverity } from '../value-objects/alert-severity';
 import { Contract } from './contract';
-import {
-  PriceDiscrepancy,
-} from '../value-objects/price-discrepancy';
+import { PriceDiscrepancy } from '../value-objects/price-discrepancy';
 import { ThresholdPolicy } from '../value-objects/threshold-policy';
 import { LegalClauseRisk } from '../value-objects/legal-clause-risk';
 import type {
@@ -13,6 +11,29 @@ import {
   CashFlowProjection,
   type CashFlowProjectionInput,
 } from '../value-objects/cash-flow-projection';
+import {
+  AiAnalysis,
+  PriceDiscrepancySummary,
+} from '../value-objects/ai-analysis';
+import { DisputeWorkflow } from '../value-objects/dispute-workflow';
+import { AuditAnalytics } from '../value-objects/audit-analytics';
+
+/* =============================================================================
+ * Budget — aggregate root de la auditoría transaccional (mapea con AUDIT#<id>
+ * del DDB single-table design). Conserva el nombre `Budget` por consistencia
+ * con el código existente.
+ *
+ * Bloques (todos opcionales excepto el core):
+ *   • core            — id, supplierId, contractId, s3Url, status, decision
+ *   • extractedBudget — datos extraídos del PDF por el LLM
+ *   • discrepancies   — granularidad por SKU (legacy)
+ *   • legalRisks      — granularidad por cláusula
+ *   • threeWayMatch   — contract vs PO vs invoice
+ *   • cashFlow        — proyecciones de tesorería del impacto
+ *   • aiAnalysis      — resumen ejecutivo del AI (precio + legal + disputa)
+ *   • analytics       — métricas operacionales y ESG por documento
+ *   • metadata        — pointers S3, processor lambda, versión, etc.
+ * ============================================================================= */
 
 export const AuditStatus = {
   Pending: 'PENDING',
@@ -29,6 +50,12 @@ export const AuditDecision = {
   Rejected: 'REJECTED',
 } as const;
 export type AuditDecision = (typeof AuditDecision)[keyof typeof AuditDecision];
+
+export type AuditDocumentType =
+  | 'INVOICE'
+  | 'PURCHASE_ORDER'
+  | 'QUOTE'
+  | 'CREDIT_NOTE';
 
 export interface ExtractedBudgetItem {
   sku: string;
@@ -48,6 +75,20 @@ export interface ExtractedBudget {
   totalAmount: Money;
   /** Texto libre de cláusulas legales si el doc lo contiene. */
   legalText?: string;
+
+  // ─────────── Extensiones extraction (opcionales) ───────────
+  invoiceNumber?: string;
+  dueDate?: Date;
+  financialsNetAmount?: Money;
+  financialsTaxAmount?: Money;
+  financialsTotalSpend?: Money;
+}
+
+export interface BudgetMetadata {
+  s3RawPdfPointer?: string;
+  processedByLambda?: string;
+  timestamp?: Date;
+  extractionVersion?: string;
 }
 
 export interface BudgetProps {
@@ -66,6 +107,13 @@ export interface BudgetProps {
   errorMessage?: string;
   createdAt: Date;
   updatedAt: Date;
+
+  // ─────────── Extensiones enterprise (opcionales) ───────────
+  documentType?: AuditDocumentType;
+  purchaseOrderReference?: string;
+  aiAnalysis?: AiAnalysis;
+  analytics?: AuditAnalytics;
+  metadata?: BudgetMetadata;
 }
 
 export interface AuditAgainstParams {
@@ -75,6 +123,7 @@ export interface AuditAgainstParams {
   legalRisks?: LegalClauseRisk[];
   threeWayMatch?: ThreeWayMatchResult | null;
   cashFlowInput?: Omit<CashFlowProjectionInput, 'totalDeviation'>;
+  analytics?: AuditAnalytics;
 }
 
 /**
@@ -84,6 +133,8 @@ export interface AuditAgainstParams {
  *   - Legal compliance risks reportados por el LLM.
  *   - Three-Way Matching contra OC y Factura.
  *   - Cash Flow Forecast (monthly/annualized overrun, margin erosion).
+ *   - AI Analysis consolidado (precio summary + legal + dispute workflow).
+ *   - Operational analytics (maverick spend, early-pay, ESG impact).
  */
 export class Budget {
   private constructor(private props: BudgetProps) {}
@@ -93,6 +144,8 @@ export class Budget {
     supplierId: string;
     s3Url: string;
     contractId?: string | null;
+    documentType?: AuditDocumentType;
+    purchaseOrderReference?: string;
     createdAt?: Date;
   }): Budget {
     const now = params.createdAt ?? new Date();
@@ -109,6 +162,8 @@ export class Budget {
       threeWayMatch: null,
       cashFlowProjection: null,
       totalDeviation: null,
+      documentType: params.documentType,
+      purchaseOrderReference: params.purchaseOrderReference,
       createdAt: now,
       updatedAt: now,
     });
@@ -130,9 +185,9 @@ export class Budget {
   }
 
   /**
-   * Núcleo del agregado. Recibe el extracto del LLM, el contrato, la
-   * política de umbrales y opcionalmente el three-way match + base para
-   * proyectar cash flow. Calcula todo y deja el estado en COMPLETED.
+   * Núcleo del agregado. Calcula discrepancias, severidades, three-way match,
+   * cash flow y deja el estado en COMPLETED. También sintetiza el resumen
+   * ejecutivo en `aiAnalysis.priceDiscrepancy` si hay un contrato base.
    */
   auditAgainst(params: AuditAgainstParams): void {
     this.props.extractedBudget = params.extracted;
@@ -171,18 +226,76 @@ export class Budget {
       });
     }
 
+    if (params.analytics) {
+      this.props.analytics = params.analytics;
+    }
+
+    this.props.aiAnalysis = this.buildAiAnalysis(totalDeviation);
     this.props.decision = this.computeDecision(params.policy, totalDeviation);
     this.props.status = AuditStatus.Completed;
     this.props.updatedAt = new Date();
   }
 
   /**
-   * Reglas:
-   *  - Si hay cualquier riesgo legal en ROJO → RequiresReview.
-   *  - Si el three-way match reporta mismatches no triviales → RequiresReview.
-   *  - Si todo está dentro de la política (incluye auto-approval limit) →
-   *    AutoApproved (luz amarilla "ok para CFO").
-   *  - Si hay discrepancia roja por precio → RequiresReview.
+   * Adjunta o actualiza el workflow de disputa. Idempotente sobre el VO
+   * `DisputeWorkflow` (clonado), no muta los campos previos.
+   */
+  attachDisputeWorkflow(workflow: DisputeWorkflow): void {
+    const current = this.props.aiAnalysis ?? AiAnalysis.empty();
+    this.props.aiAnalysis = current.withDisputeWorkflow(workflow);
+    this.props.updatedAt = new Date();
+  }
+
+  /**
+   * Construye el bloque AI Analysis consolidado. Si hay discrepancias de
+   * precio agrega el resumen ejecutivo (overcost, deviation, severidad), y
+   * propaga los legal risks. El dispute workflow se preserva si ya existía.
+   */
+  private buildAiAnalysis(totalDeviation: Money): AiAnalysis {
+    const extracted = this.props.extractedBudget;
+    const baseTotal = extracted?.totalAmount.amount ?? 0;
+    const previousWorkflow = this.props.aiAnalysis?.disputeWorkflow ?? null;
+
+    let priceSummary: PriceDiscrepancySummary | null = null;
+    if (
+      this.props.discrepancies.length > 0 &&
+      totalDeviation.amount > 0 &&
+      baseTotal > 0
+    ) {
+      const maxSeverity = this.props.discrepancies.reduce<AlertSeverity>(
+        (acc, d) => this.maxSeverity(acc, d.severity),
+        AlertSeverity.Green,
+      );
+
+      priceSummary = PriceDiscrepancySummary.of({
+        detectedOvercost: totalDeviation,
+        deviationPercentage: (totalDeviation.amount / baseTotal) * 100,
+        severityLevel: maxSeverity,
+        marketBenchmarkPrice: null,
+      });
+    }
+
+    return AiAnalysis.of({
+      priceDiscrepancy: priceSummary,
+      legalClauseRisks: this.props.legalRisks,
+      disputeWorkflow: previousWorkflow,
+    });
+  }
+
+  private maxSeverity(a: AlertSeverity, b: AlertSeverity): AlertSeverity {
+    const rank: Record<AlertSeverity, number> = {
+      [AlertSeverity.Green]: 0,
+      [AlertSeverity.Yellow]: 1,
+      [AlertSeverity.Red]: 2,
+    };
+    return rank[a] >= rank[b] ? a : b;
+  }
+
+  /**
+   * Reglas de decisión (sin cambios respecto a la versión legacy):
+   *  - Cualquier riesgo legal en ROJO → RequiresReview.
+   *  - Three-way mismatch no trivial → RequiresReview.
+   *  - Discrepancia roja por precio + no califica auto-approval → RequiresReview.
    *  - Caso contrario → AutoApproved.
    */
   private computeDecision(
@@ -222,6 +335,16 @@ export class Budget {
   get errorMessage(): string | undefined { return this.props.errorMessage; }
   get createdAt(): Date { return this.props.createdAt; }
   get updatedAt(): Date { return this.props.updatedAt; }
+
+  get documentType(): AuditDocumentType | undefined {
+    return this.props.documentType;
+  }
+  get purchaseOrderReference(): string | undefined {
+    return this.props.purchaseOrderReference;
+  }
+  get aiAnalysis(): AiAnalysis | undefined { return this.props.aiAnalysis; }
+  get analytics(): AuditAnalytics | undefined { return this.props.analytics; }
+  get metadata(): BudgetMetadata | undefined { return this.props.metadata; }
 
   get totalDeviationPercent(): number {
     if (!this.props.extractedBudget || !this.props.totalDeviation) return 0;

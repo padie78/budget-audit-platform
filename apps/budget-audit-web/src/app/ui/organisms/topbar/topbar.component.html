@@ -1,0 +1,71 @@
+<header
+  class="flex items-center justify-end gap-3 h-20 px-6 bg-slate-950 border-b border-slate-800/80 select-none"
+>
+  <!-- ─────────── Notificaciones (visual) ─────────── -->
+  <button
+    type="button"
+    pTooltip="Notificaciones"
+    tooltipPosition="bottom"
+    class="relative w-10 h-10 rounded-full flex items-center justify-center text-slate-300 hover:text-white bg-slate-900/80 hover:bg-slate-800/70 ring-1 ring-slate-800/60 hover:ring-slate-700/70 transition-colors duration-150"
+    aria-label="Notificaciones"
+  >
+    <i class="pi pi-bell text-[15px]"></i>
+    <span
+      *ngIf="hasUnreadNotifications()"
+      class="absolute top-2 right-2 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-slate-950"
+      aria-hidden="true"
+    ></span>
+  </button>
+
+  <!-- separador sutil -->
+  <span class="w-px h-8 bg-slate-800/80 mx-1" aria-hidden="true"></span>
+
+  <!-- ─────────── Disparador del menú de usuario ─────────── -->
+  <button
+    type="button"
+    (click)="menu.toggle($event)"
+    aria-haspopup="true"
+    aria-label="Abrir menú de usuario"
+    class="group flex items-center gap-3 pl-1 pr-3 py-1 rounded-full bg-slate-900/80 hover:bg-slate-800/70 ring-1 ring-slate-800/60 hover:ring-indigo-500/40 transition-colors duration-150"
+  >
+    <p-avatar
+      *ngIf="avatarUrl(); else fallbackAvatar"
+      [image]="avatarUrl()!"
+      shape="circle"
+      size="normal"
+      styleClass="topbar-avatar"
+    ></p-avatar>
+
+    <ng-template #fallbackAvatar>
+      <p-avatar
+        [label]="initials()"
+        shape="circle"
+        size="normal"
+        styleClass="topbar-avatar topbar-avatar--initials"
+      ></p-avatar>
+    </ng-template>
+
+    <div class="hidden sm:flex flex-col leading-tight text-left">
+      <span class="text-[13px] font-semibold text-white truncate max-w-[140px]">
+        {{ userName() }}
+      </span>
+      <span class="text-[11px] text-slate-400 flex items-center gap-1">
+        <i class="pi pi-shield text-[10px] text-emerald-400"></i>
+        {{ userRole() }}
+      </span>
+    </div>
+
+    <i
+      class="pi pi-chevron-down text-[10px] text-slate-400 group-hover:text-slate-200 transition-colors"
+    ></i>
+  </button>
+
+  <!-- Popup flotante del menú de usuario -->
+  <p-menu
+    #menu
+    [model]="userMenuItems"
+    [popup]="true"
+    appendTo="body"
+    styleClass="custom-user-menu"
+  ></p-menu>
+</header>

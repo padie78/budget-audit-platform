@@ -1,0 +1,152 @@
+/* =========================================================================
+ *  <app-topbar> — ProcureTech OS
+ *
+ *  Estilos puntuales para neutralizar PrimeNG (lara-light) tanto en el
+ *  `p-avatar` del disparador como en el `p-menu` popup. Las clases Tailwind
+ *  del template manejan el resto (layout, hover, ring, transitions).
+ *
+ *  Nota: en Angular se usa `::ng-deep` (no `::v-deep`, que es de Vue) para
+ *  perforar la encapsulación de los componentes hijos generados por
+ *  PrimeNG. El popup se renderiza con `appendTo="body"`, por eso las reglas
+ *  de `.custom-user-menu` van fuera del scope del host.
+ * ========================================================================= */
+:host {
+  display: block;
+}
+
+/* ─────────── Avatar dentro del disparador ─────────── */
+::ng-deep .topbar-avatar.p-avatar {
+  background: rgb(15 23 42); /* slate-900 */
+  color: rgb(226 232 240); /* slate-200 */
+  width: 2.25rem;
+  height: 2.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border: 1px solid rgba(99, 102, 241, 0.35); /* indigo-500/35 */
+  box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.6) inset;
+
+  img {
+    object-fit: cover;
+  }
+}
+
+::ng-deep .topbar-avatar--initials.p-avatar {
+  background: linear-gradient(
+    135deg,
+    rgb(99 102 241) 0%,
+    rgb(168 85 247) 100%
+  ); /* indigo-500 → purple-500 */
+  color: white;
+}
+
+/* =========================================================================
+ *  Popup global — `.custom-user-menu`
+ *  Vive en <body> por `appendTo="body"`, por eso las reglas van fuera del
+ *  scope del host pero dentro de `::ng-deep` para que el compilador no las
+ *  recorte por encapsulación.
+ * ========================================================================= */
+::ng-deep .custom-user-menu.p-menu {
+  background: rgb(2 6 23) !important; /* slate-950 */
+  border: 1px solid rgb(30 41 59) !important; /* slate-800 */
+  border-radius: 0.75rem !important; /* rounded-xl */
+  padding: 0.4rem !important;
+  min-width: 14rem;
+  box-shadow:
+    0 10px 25px -5px rgba(0, 0, 0, 0.55),
+    0 8px 10px -6px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(99, 102, 241, 0.06);
+  margin-top: 0.5rem;
+  font-family: inherit;
+
+  /* Eliminar fondos / bordes de wrappers internos */
+  .p-menu-list,
+  .p-submenu-header,
+  .p-menuitem,
+  .p-menuitem-content {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  .p-menu-list {
+    padding: 0;
+    margin: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+
+  /* ─────────── Item ─────────── */
+  .p-menuitem-link,
+  a.p-menuitem-link {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.55rem 0.75rem !important;
+    border-radius: 0.5rem !important;
+    color: rgb(203 213 225) !important; /* slate-300 */
+    font-size: 0.825rem;
+    font-weight: 500;
+    text-decoration: none !important;
+    background: transparent !important;
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+    transition:
+      background-color 0.15s ease,
+      color 0.15s ease;
+
+    .p-menuitem-icon {
+      color: rgb(148 163 184); /* slate-400 */
+      font-size: 0.8rem;
+      transition: color 0.15s ease;
+    }
+
+    .p-menuitem-text {
+      color: inherit;
+      font-size: inherit;
+      font-weight: inherit;
+    }
+
+    &:hover,
+    &:focus,
+    &.p-menuitem-link-active {
+      background: rgb(30 41 59) !important; /* slate-800 */
+      color: rgb(199 210 254) !important; /* indigo-200 */
+      outline: none !important;
+
+      .p-menuitem-icon {
+        color: rgb(165 180 252); /* indigo-300 */
+      }
+    }
+  }
+
+  /* ─────────── Item destructivo (Cerrar Sesión) ─────────── */
+  .menu-item-danger .p-menuitem-link {
+    color: rgb(252 165 165) !important; /* red-300 */
+
+    .p-menuitem-icon {
+      color: rgb(248 113 113); /* red-400 */
+    }
+
+    &:hover,
+    &:focus {
+      background: rgba(127, 29, 29, 0.35) !important; /* red-900/35 */
+      color: rgb(254 202 202) !important; /* red-200 */
+
+      .p-menuitem-icon {
+        color: rgb(252 165 165); /* red-300 */
+      }
+    }
+  }
+
+  /* ─────────── Separador ─────────── */
+  .p-menu-separator,
+  .p-menuitem-separator {
+    height: 1px;
+    margin: 0.35rem 0.25rem;
+    background: rgb(30 41 59); /* slate-800 */
+    border: none;
+  }
+}
