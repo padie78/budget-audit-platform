@@ -37,6 +37,12 @@ import type {
 
 type CreateSupplierViewInput = Omit<CreateSupplierInputDto, 'tenantId'>;
 type UpdateSupplierViewInput = Omit<UpdateSupplierInputDto, 'tenantId'>;
+
+/** Recorta un número al rango [0, 1] — usado para enviar ratios al backend. */
+function clamp01(n: number): number {
+  if (Number.isNaN(n)) return 0;
+  return Math.max(0, Math.min(1, n));
+}
 import { SupplierService } from '../../services/supplier.service';
 import {
   toSupplierRowVm,
@@ -295,11 +301,11 @@ export class SuppliersPortalPageComponent {
           | 'STRATEGIC',
       },
       vendorPerformance: {
-        reliabilityScore: v.fidelityScore,
+        reliabilityScore: clamp01((v.fidelityScore ?? 80) / 100),
         totalAuditedDocs: 0,
         totalDisputesRaised: 0,
         averageDisputeResolutionDays: 0,
-        slaDeliveryComplianceRate: 100,
+        slaDeliveryComplianceRate: 1,
         trend: 'STABLE' as const,
       },
     };

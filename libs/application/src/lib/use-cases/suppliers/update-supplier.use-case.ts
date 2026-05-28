@@ -130,6 +130,18 @@ export class UpdateSupplierUseCase {
   }
 
   private buildVendorPerformance(v: VendorPerformanceDto): VendorPerformance {
-    return VendorPerformance.of(v);
+    return VendorPerformance.of({
+      ...v,
+      reliabilityScore: clamp01(v.reliabilityScore),
+      slaDeliveryComplianceRate: clamp01(v.slaDeliveryComplianceRate),
+      totalAuditedDocs: Math.max(0, v.totalAuditedDocs | 0),
+      totalDisputesRaised: Math.max(0, v.totalDisputesRaised | 0),
+      averageDisputeResolutionDays: Math.max(0, v.averageDisputeResolutionDays),
+    });
   }
+}
+
+function clamp01(n: number): number {
+  if (Number.isNaN(n)) return 0;
+  return Math.max(0, Math.min(1, n));
 }

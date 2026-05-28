@@ -22,6 +22,11 @@ import type {
 import type { IIdGenerator } from '../../ports/id-generator.port';
 import type { ILogger } from '../../ports/logger.port';
 
+function clamp01(n: number): number {
+  if (Number.isNaN(n)) return 0;
+  return Math.max(0, Math.min(1, n));
+}
+
 /* =============================================================================
  * CreateSupplierUseCase — agrega un nuevo proveedor al catálogo.
  *
@@ -162,7 +167,17 @@ export class CreateSupplierUseCase {
       slaDeliveryComplianceRate: 1,
       trend: 'STABLE' as const,
     };
-    return VendorPerformance.of(src);
+    return VendorPerformance.of({
+      ...src,
+      reliabilityScore: clamp01(src.reliabilityScore),
+      slaDeliveryComplianceRate: clamp01(src.slaDeliveryComplianceRate),
+      totalAuditedDocs: Math.max(0, src.totalAuditedDocs | 0),
+      totalDisputesRaised: Math.max(0, src.totalDisputesRaised | 0),
+      averageDisputeResolutionDays: Math.max(
+        0,
+        src.averageDisputeResolutionDays,
+      ),
+    });
   }
 
   private buildSmartThresholds(
