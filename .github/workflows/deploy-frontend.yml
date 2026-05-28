@@ -62,11 +62,20 @@ jobs:
         id: tf
         working-directory: terraform
         run: |
+          set -euo pipefail
           terraform init -backend=true -input=false -no-color
-          BUCKET=$(terraform output -raw frontend_bucket)
-          DIST_ID=$(terraform output -raw frontend_cloudfront_id)
-          APPSYNC_ENDPOINT=$(terraform output -raw appsync_endpoint)
-          APPSYNC_API_KEY=$(terraform output -raw appsync_api_key)
+          if ! terraform output -json >/dev/null 2>&1; then
+            echo "::error::Terraform no tiene outputs disponibles. Ejecutá primero Deploy Infrastructure y asegurate de usar un backend remoto (S3/DynamoDB) para compartir el state entre workflows."
+            exit 1
+          fi
+          BUCKET=$(terraform output -raw frontend_bucket 2>/dev/null || true)
+          DIST_ID=$(terraform output -raw frontend_cloudfront_id 2>/dev/null || true)
+          APPSYNC_ENDPOINT=$(terraform output -raw appsync_endpoint 2>/dev/null || true)
+          APPSYNC_API_KEY=$(terraform output -raw appsync_api_key 2>/dev/null || true)
+          if [ -z "$BUCKET" ] || [ -z "$DIST_ID" ] || [ -z "$APPSYNC_ENDPOINT" ] || [ -z "$APPSYNC_API_KEY" ]; then
+            echo "::error::Faltan outputs Terraform requeridos para frontend (frontend_bucket, frontend_cloudfront_id, appsync_endpoint, appsync_api_key)."
+            exit 1
+          fi
           {
             echo "bucket=$BUCKET"
             echo "distribution_id=$DIST_ID"

@@ -121,8 +121,17 @@ jobs:
         id: tf
         working-directory: terraform
         run: |
+          set -euo pipefail
           terraform init -backend=true -input=false -no-color
-          FN_NAME=$(terraform output -raw ${{ matrix.tf_output }})
+          if ! terraform output -json >/dev/null 2>&1; then
+            echo "::error::Terraform no tiene outputs disponibles. Ejecutá primero Deploy Infrastructure y asegurate de usar un backend remoto (S3/DynamoDB) para compartir el state entre workflows."
+            exit 1
+          fi
+          FN_NAME=$(terraform output -raw ${{ matrix.tf_output }} 2>/dev/null || true)
+          if [ -z "$FN_NAME" ]; then
+            echo "::error::No se encontró el output Terraform '${{ matrix.tf_output }}'. Revisá terraform/outputs.tf y que la infraestructura haya sido aplicada."
+            exit 1
+          fi
           echo "function_name=$FN_NAME" >> "$GITHUB_OUTPUT"
 
       - name: Update Lambda code
