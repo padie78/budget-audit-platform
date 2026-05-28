@@ -85,22 +85,6 @@ input SignUploadInput {
   contentType: String!
 }
 
-input BudgetInput {
-  budgetId: ID!
-  supplierId: ID!
-  budget: AWSJSON!
-}
-
-input AuditCompletedEventInput {
-  budgetId: ID!
-  supplierId: ID!
-  budget: AWSJSON!
-}
-
-type AuditCompletedAck {
-  budgetId: ID!
-}
-
 type Query {
   getBudget(supplierId: ID!, budgetId: ID!): Budget
   listBudgetsBySupplier(supplierId: ID!, limit: Int): [Budget!]!
@@ -116,8 +100,8 @@ type Mutation {
 
   # Mutations internas usadas por la propia Lambda para emitir eventos
   # que despiertan a las subscriptions. NO usar desde el frontend.
-  publishAuditCompleted(event: AuditCompletedEventInput!): AuditCompletedAck!
-  publishAuditFailed(budget: BudgetInput!): AuditCompletedAck!
+  publishAuditCompleted(budget: AWSJSON!): Budget!
+  publishAuditFailed(budget: AWSJSON!): Budget!
 }
 
 type Subscription {

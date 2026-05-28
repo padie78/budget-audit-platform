@@ -177,9 +177,7 @@ resource "aws_appsync_resolver" "publish_audit_completed" {
   field             = "publishAuditCompleted"
   data_source       = aws_appsync_datasource.none.name
   request_template  = local.passthrough_request_template
-  response_template = <<EOT
-$util.toJson({ "budgetId": $context.arguments.event.budgetId })
-EOT
+  response_template = "$util.toJson($context.arguments.budget)"
 }
 
 resource "aws_appsync_resolver" "publish_audit_failed" {
@@ -188,7 +186,5 @@ resource "aws_appsync_resolver" "publish_audit_failed" {
   field             = "publishAuditFailed"
   data_source       = aws_appsync_datasource.none.name
   request_template  = local.passthrough_request_template
-  response_template = <<EOT
-$util.toJson({ "budgetId": $context.arguments.budget.budgetId })
-EOT
+  response_template = "$util.toJson($context.arguments.budget)"
 }

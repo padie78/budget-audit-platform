@@ -1,6 +1,5 @@
 import { Budget, type IAuditEventPublisher } from '@budget-audit/domain';
 import { BudgetMapper } from '@budget-audit/application';
-import type { OnAuditCompletedEvent } from '@budget-audit/common';
 
 /**
  * Publica el resultado de la auditoría hacia AppSync invocando una mutation
@@ -31,29 +30,27 @@ export class AppSyncEventPublisherAdapter implements IAuditEventPublisher {
 
   async publishAuditCompleted(budget: Budget): Promise<void> {
     const dto = BudgetMapper.toDto(budget);
-    const event: OnAuditCompletedEvent = {
-      budgetId: dto.id,
-      supplierId: dto.supplierId,
-      budget: dto,
-    };
-
     const mutation = `
-      mutation PublishAuditCompleted($event: AuditCompletedEventInput!) {
-        publishAuditCompleted(event: $event) {
-          budgetId
+      mutation PublishAuditCompleted($budget: AWSJSON!) {
+        publishAuditCompleted(budget: $budget) {
+          id
+          supplierId
+          status
         }
       }
     `;
 
-    await this.sendGraphQL(mutation, { event });
+    await this.sendGraphQL(mutation, { budget: dto });
   }
 
   async publishAuditFailed(budget: Budget): Promise<void> {
     const dto = BudgetMapper.toDto(budget);
     const mutation = `
-      mutation PublishAuditFailed($budget: BudgetInput!) {
+      mutation PublishAuditFailed($budget: AWSJSON!) {
         publishAuditFailed(budget: $budget) {
-          budgetId
+          id
+          supplierId
+          status
         }
       }
     `;
