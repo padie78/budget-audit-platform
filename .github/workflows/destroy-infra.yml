@@ -26,6 +26,9 @@ permissions:
 
 env:
   AWS_REGION: ${{ vars.AWS_REGION || 'eu-central-1' }}
+  TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+  TF_STATE_LOCKS_TABLE: ${{ vars.TF_STATE_LOCKS_TABLE || 'budget-audit-platform-tf-locks' }}
+  TF_STATE_KEY: ${{ vars.TF_STATE_KEY || 'prod/terraform.tfstate' }}
   TF_IN_AUTOMATION: "true"
   TF_INPUT: "false"
 
@@ -76,8 +79,21 @@ jobs:
           terraform_version: 1.9.5
           terraform_wrapper: false
 
+      - name: Validate Terraform state backend config
+        run: |
+          if [ -z "$TF_STATE_BUCKET" ]; then
+            echo "::error::Falta la repository variable TF_STATE_BUCKET (bucket S3 del state remoto)."
+            exit 1
+          fi
+
       - name: Terraform init
-        run: terraform init -upgrade
+        run: |
+          terraform init -upgrade -input=false \
+            -backend-config="bucket=${TF_STATE_BUCKET}" \
+            -backend-config="key=${TF_STATE_KEY}" \
+            -backend-config="region=${AWS_REGION}" \
+            -backend-config="dynamodb_table=${TF_STATE_LOCKS_TABLE}" \
+            -backend-config="encrypt=true"
 
       - name: Empty S3 buckets
         if: ${{ inputs.empty_buckets }}

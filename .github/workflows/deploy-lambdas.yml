@@ -24,6 +24,9 @@ permissions:
 
 env:
   AWS_REGION: ${{ vars.AWS_REGION || 'eu-central-1' }}
+  TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+  TF_STATE_LOCKS_TABLE: ${{ vars.TF_STATE_LOCKS_TABLE || 'budget-audit-platform-tf-locks' }}
+  TF_STATE_KEY: ${{ vars.TF_STATE_KEY || 'prod/terraform.tfstate' }}
 
 jobs:
   build:
@@ -122,7 +125,18 @@ jobs:
         working-directory: terraform
         run: |
           set -euo pipefail
-          terraform init -backend=true -input=false -no-color
+
+          if [ -z "${TF_STATE_BUCKET}" ]; then
+            echo "::error::Falta la repository variable TF_STATE_BUCKET (bucket S3 del state remoto)."
+            exit 1
+          fi
+
+          terraform init -input=false -no-color \
+            -backend-config="bucket=${TF_STATE_BUCKET}" \
+            -backend-config="key=${TF_STATE_KEY}" \
+            -backend-config="region=${AWS_REGION}" \
+            -backend-config="dynamodb_table=${TF_STATE_LOCKS_TABLE}" \
+            -backend-config="encrypt=true"
 
           terraform output -json > tf-outputs.json 2> tf-output.err || true
           if ! jq -e 'type == "object" and length > 0' tf-outputs.json >/dev/null 2>&1; then
